@@ -1,0 +1,88 @@
+# Tradera category IDs mapped to our internal sub-category labels
+# Source: https://www.tradera.com/en/category/302073 (women's) and /302074 (men's)
+# Verify IDs by visiting: https://www.tradera.com/en/category/<ID>
+
+categories:
+  # --- Women's ---
+  - label: dam_tröjor_stickade        # sweaters / knitwear
+    tradera_id: 1629
+    gender: dam
+    display: "Dam – Tröjor & Stickade"
+
+  - label: dam_jackor_kappor          # jackets / coats
+    tradera_id: 1633
+    gender: dam
+    display: "Dam – Jackor & Kappor"
+
+  - label: dam_klänningar             # dresses
+    tradera_id: 301741
+    gender: dam
+    display: "Dam – Klänningar"
+
+  - label: dam_toppar                 # tops
+    tradera_id: 1000724
+    gender: dam
+    display: "Dam – Toppar"
+
+  - label: dam_blusar                 # blouses
+    tradera_id: 1000726
+    gender: dam
+    display: "Dam – Blusar"
+
+  - label: dam_byxor                  # trousers
+    tradera_id: 1000738
+    gender: dam
+    display: "Dam – Byxor"
+
+  - label: dam_jeans                  # jeans
+    tradera_id: 340326
+    gender: dam
+    display: "Dam – Jeans"
+
+  - label: dam_kjolar                 # skirts
+    tradera_id: 1001282
+    gender: dam
+    display: "Dam – Kjolar"
+
+  - label: dam_skjortor               # shirts
+    tradera_id: 1630
+    gender: dam
+    display: "Dam – Skjortor"
+
+  - label: dam_kavajer_kostymer       # blazers / suits
+    tradera_id: 340295
+    gender: dam
+    display: "Dam – Kavajer & Kostymer"
+
+  # --- Men's ---
+  # NOTE: Men's sub-category IDs are unverified — check by visiting
+  # https://www.tradera.com/en/category/302074 and clicking each sub-cat
+  - label: herr_tröjor_stickade
+    tradera_id: 1628
+    gender: herr
+    display: "Herr – Tröjor & Stickade"
+    verify: true
+
+  - label: herr_jackor_kappor
+    tradera_id: 1632
+    gender: herr
+    display: "Herr – Jackor"
+    verify: true
+
+  - label: herr_byxor
+    tradera_id: 1000739
+    gender: herr
+    display: "Herr – Byxor"
+    verify: true
+
+  - label: herr_jeans
+    tradera_id: 340327
+    gender: herr
+    display: "Herr – Jeans"
+    verify: true
+
+  - label: herr_tshirts_toppar
+    tradera_id: 1000725
+    gender: herr
+    display: "Herr – T-shirts & Toppar"
+    verify: true

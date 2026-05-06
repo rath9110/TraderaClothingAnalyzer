@@ -1,0 +1,217 @@
+# Priority brands for velocity tracking
+# aliases: list of regex-matchable name variants (case-insensitive)
+brands:
+  # --- Swedish / Scandinavian ---
+  - name: Acne Studios
+    aliases: ["acne studios", "acne"]
+    tier: premium
+
+  - name: Our Legacy
+    aliases: ["our legacy"]
+    tier: premium
+
+  - name: Tiger of Sweden
+    aliases: ["tiger of sweden", "tiger"]
+    tier: mid
+
+  - name: Filippa K
+    aliases: ["filippa k", "filippa-k"]
+    tier: mid
+
+  - name: Gant
+    aliases: ["gant"]
+    tier: mid
+
+  - name: J.Lindeberg
+    aliases: ["j\\.?lindeberg", "j lindeberg"]
+    tier: mid
+
+  - name: Nudie Jeans
+    aliases: ["nudie jeans", "nudie"]
+    tier: mid
+
+  - name: Samsøe Samsøe
+    aliases: ["samsøe", "samsoe"]
+    tier: mid
+
+  - name: Norse Projects
+    aliases: ["norse projects"]
+    tier: premium
+
+  - name: Hope Stockholm
+    aliases: ["hope stockholm", "hope"]
+    tier: premium
+
+  - name: Toteme
+    aliases: ["toteme"]
+    tier: premium
+
+  - name: Rodebjer
+    aliases: ["rodebjer"]
+    tier: mid
+
+  - name: Whyred
+    aliases: ["whyred"]
+    tier: mid
+
+  - name: Björn Borg
+    aliases: ["björn borg", "bjorn borg"]
+    tier: mid
+
+  # --- H&M Group ---
+  - name: H&M
+    aliases: ["h&m", "h och m", "hennes och mauritz"]
+    tier: budget
+
+  - name: "& Other Stories"
+    aliases: ["& other stories", "other stories"]
+    tier: mid
+
+  - name: COS
+    aliases: ["\\bcos\\b"]
+    tier: mid
+
+  - name: Weekday
+    aliases: ["weekday"]
+    tier: budget
+
+  - name: Monki
+    aliases: ["monki"]
+    tier: budget
+
+  - name: Arket
+    aliases: ["arket"]
+    tier: mid
+
+  # --- International mid-market ---
+  - name: Zara
+    aliases: ["zara"]
+    tier: budget
+
+  - name: Mango
+    aliases: ["mango"]
+    tier: budget
+
+  - name: Massimo Dutti
+    aliases: ["massimo dutti"]
+    tier: mid
+
+  - name: "& Other Stories"
+    aliases: []  # already defined above, skipped in dedup
+    tier: mid
+
+  - name: Ralph Lauren
+    aliases: ["ralph lauren", "polo ralph lauren", "polo rl"]
+    tier: mid
+
+  - name: Tommy Hilfiger
+    aliases: ["tommy hilfiger", "tommy"]
+    tier: mid
+
+  - name: Calvin Klein
+    aliases: ["calvin klein", "\\bck\\b"]
+    tier: mid
+
+  - name: Levi's
+    aliases: ["levi'?s", "levis"]
+    tier: mid
+
+  - name: Lee
+    aliases: ["\\blee\\b"]
+    tier: budget
+
+  - name: Wrangler
+    aliases: ["wrangler"]
+    tier: budget
+
+  - name: Carhartt
+    aliases: ["carhartt"]
+    tier: mid
+
+  - name: Dickies
+    aliases: ["dickies"]
+    tier: budget
+
+  # --- Outdoor / Performance ---
+  - name: Patagonia
+    aliases: ["patagonia"]
+    tier: premium
+
+  - name: Arc'teryx
+    aliases: ["arc'?teryx", "arcteryx"]
+    tier: premium
+
+  - name: Fjällräven
+    aliases: ["fjällräven", "fjallraven"]
+    tier: premium
+
+  - name: Houdini
+    aliases: ["houdini"]
+    tier: premium
+
+  - name: Haglöfs
+    aliases: ["haglöfs", "haglofs"]
+    tier: mid
+
+  - name: Peak Performance
+    aliases: ["peak performance"]
+    tier: mid
+
+  - name: The North Face
+    aliases: ["the north face", "tnf", "north face"]
+    tier: premium
+
+  # --- Sports ---
+  - name: Nike
+    aliases: ["nike"]
+    tier: mid
+
+  - name: Adidas
+    aliases: ["adidas"]
+    tier: mid
+
+  - name: New Balance
+    aliases: ["new balance"]
+    tier: mid
+
+  - name: Reebok
+    aliases: ["reebok"]
+    tier: budget
+
+  # --- Luxury ---
+  - name: Gucci
+    aliases: ["gucci"]
+    tier: luxury
+
+  - name: Prada
+    aliases: ["prada"]
+    tier: luxury
+
+  - name: Burberry
+    aliases: ["burberry"]
+    tier: luxury
+
+  - name: Helmut Lang
+    aliases: ["helmut lang"]
+    tier: luxury
+
+  - name: Isabel Marant
+    aliases: ["isabel marant"]
+    tier: luxury
+
+  - name: Toteme
+    aliases: []  # already defined above
+    tier: premium
+
+  # --- Denim specialists ---
+  - name: Weekday
+    aliases: []  # already defined above
+    tier: budget
+
+  - name: Dr. Denim
+    aliases: ["dr\\.? denim"]
+    tier: budget
+
+  - name: Cheap Monday
+    aliases: ["cheap monday"]
+    tier: budget

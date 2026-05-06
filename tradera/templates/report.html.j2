@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="sv">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Tradera Velocity – Week {{ week }}, {{ generated_at }}</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css">
+  <link rel="stylesheet" href="https://cdn.datatables.net/1.13.8/css/dataTables.bootstrap5.min.css">
+  <link rel="stylesheet" href="https://cdn.datatables.net/buttons/2.4.2/css/buttons.bootstrap5.min.css">
+  <style>
+    body { font-size: 0.9rem; }
+    .badge-high  { background: #198754; color: #fff; }
+    .badge-med   { background: #ffc107; color: #000; }
+    .badge-low   { background: #dc3545; color: #fff; }
+    .badge-dim   { background: #6c757d; color: #fff; }
+    .top-pick-row td:first-child { font-weight: 600; }
+    th { white-space: nowrap; }
+    .stat-card { border-left: 4px solid #0d6efd; padding: .75rem 1rem; background: #f8f9fa; border-radius: 4px; }
+  </style>
+</head>
+<body class="bg-white">
+<div class="container-fluid py-4 px-4">
+
+  <!-- Header -->
+  <div class="d-flex justify-content-between align-items-start mb-4">
+    <div>
+      <h2 class="mb-0">Tradera Velocity Report</h2>
+      <small class="text-muted">Week {{ week }} · Generated {{ generated_at }} · Rolling 90-day window</small>
+    </div>
+    <div class="d-flex gap-3">
+      <div class="stat-card text-center">
+        <div class="fs-4 fw-bold text-primary">{{ total_items }}</div>
+        <div class="text-muted" style="font-size:.75rem">items analysed</div>
+      </div>
+      <div class="stat-card text-center">
+        <div class="fs-4 fw-bold text-primary">{{ brand_count }}</div>
+        <div class="text-muted" style="font-size:.75rem">brands matched</div>
+      </div>
+      <div class="stat-card text-center">
+        <div class="fs-4 fw-bold text-primary">{{ all_cells | length }}</div>
+        <div class="text-muted" style="font-size:.75rem">cells (brand×cat×size)</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Top 20 Sourcing Picks ── -->
+  <div class="card mb-5 border-0 shadow-sm">
+    <div class="card-header bg-primary text-white">
+      <strong>Top 20 Sourcing Picks</strong>
+      <span class="ms-2 badge bg-light text-dark" style="font-weight:400">
+        n ≥ 5 · ranked by velocity score = sell-through × ln(n+1)
+      </span>
+    </div>
+    <div class="card-body p-0">
+      <table class="table table-hover table-sm mb-0">
+        <thead class="table-light">
+          <tr>
+            <th>#</th>
+            <th>Brand</th>
+            <th>Category</th>
+            <th>Size</th>
+            <th>n</th>
+            <th>Sell-through %</th>
+            <th>Median price (kr)</th>
+            <th>p25 – p75</th>
+            <th>Median bids</th>
+            <th>Velocity</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for cell in top_picks %}
+          <tr class="top-pick-row">
+            <td class="text-muted">{{ loop.index }}</td>
+            <td>{{ cell.brand }}</td>
+            <td><small>{{ cell.category }}</small></td>
+            <td>{{ cell.size }}</td>
+            <td>{{ cell.n }}</td>
+            <td>
+              <div class="d-flex align-items-center gap-2">
+                <div class="progress flex-grow-1" style="height:6px; min-width:60px">
+                  <div class="progress-bar
+                    {% if cell.sell_through_pct >= 70 %}bg-success
+                    {% elif cell.sell_through_pct >= 40 %}bg-warning
+                    {% else %}bg-danger{% endif %}"
+                    style="width:{{ cell.sell_through_pct }}%"></div>
+                </div>
+                <small>{{ cell.sell_through_pct }}%</small>
+              </div>
+            </td>
+            <td>{% if cell.median_price_sek %}{{ cell.median_price_sek }}{% else %}–{% endif %}</td>
+            <td>
+              {% if cell.p25_sek and cell.p75_sek %}
+                <small class="text-muted">{{ cell.p25_sek }} – {{ cell.p75_sek }}</small>
+              {% else %}–{% endif %}
+            </td>
+            <td>{{ cell.median_bids }}</td>
+            <td>
+              <span class="badge rounded-pill badge-{{ cell.velocity_class }}">
+                {{ cell.velocity_score }}
+              </span>
+            </td>
+          </tr>
+          {% else %}
+          <tr><td colspan="10" class="text-center text-muted py-3">No data yet — run a scrape first.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- ── Full Analysis Table ── -->
+  <div class="card border-0 shadow-sm">
+    <div class="card-header">
+      <strong>Full Analysis</strong>
+      <span class="ms-2 text-muted" style="font-size:.8rem">All brand × category × size cells · low-confidence (n&lt;5) shown in grey</span>
+    </div>
+    <div class="card-body">
+      <table id="full-table" class="table table-sm table-striped" style="width:100%">
+        <thead>
+          <tr>
+            <th>Brand</th>
+            <th>Category</th>
+            <th>Size</th>
+            <th>n</th>
+            <th>Sell-through %</th>
+            <th>Median kr</th>
+            <th>p25</th>
+            <th>p75</th>
+            <th>Median bids</th>
+            <th>Velocity</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for cell in all_cells %}
+          <tr {% if cell.low_confidence %}class="text-muted"{% endif %}>
+            <td>{{ cell.brand }}</td>
+            <td><small>{{ cell.category }}</small></td>
+            <td>{{ cell.size }}</td>
+            <td>{{ cell.n }}</td>
+            <td>{{ cell.sell_through_pct }}%</td>
+            <td>{% if cell.median_price_sek %}{{ cell.median_price_sek }}{% else %}–{% endif %}</td>
+            <td>{% if cell.p25_sek %}{{ cell.p25_sek }}{% else %}–{% endif %}</td>
+            <td>{% if cell.p75_sek %}{{ cell.p75_sek }}{% else %}–{% endif %}</td>
+            <td>{{ cell.median_bids }}</td>
+            <td>
+              <span class="badge rounded-pill {% if cell.low_confidence %}badge-dim{% else %}badge-{{ cell.velocity_class }}{% endif %}">
+                {{ cell.velocity_score }}
+              </span>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <p class="text-muted mt-4" style="font-size:.75rem">
+    Velocity score = sell-through rate × ln(n+1). Cells with n&lt;5 are low-confidence and excluded from Top 20.
+    Source: Tradera /en/category/ ended auctions. Personal tool, single user.
+  </p>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+<script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+<script src="https://cdn.datatables.net/1.13.8/js/jquery.dataTables.min.js"></script>
+<script src="https://cdn.datatables.net/1.13.8/js/dataTables.bootstrap5.min.js"></script>
+<script src="https://cdn.datatables.net/buttons/2.4.2/js/dataTables.buttons.min.js"></script>
+<script src="https://cdn.datatables.net/buttons/2.4.2/js/buttons.bootstrap5.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<script src="https://cdn.datatables.net/buttons/2.4.2/js/buttons.html5.min.js"></script>
+<script>
+$(document).ready(function () {
+  $('#full-table').DataTable({
+    pageLength: 50,
+    order: [[9, 'desc']],
+    dom: '<"d-flex justify-content-between align-items-center mb-2"<"d-flex gap-2"Bf><l>>rtip',
+    buttons: [{ extend: 'csvHtml5', text: 'Export CSV', className: 'btn btn-sm btn-outline-secondary' }],
+    columnDefs: [
+      { targets: [3,4,5,6,7,8,9], className: 'text-end' }
+    ]
+  });
+});
+</script>
+</body>
+</html>

@@ -1,0 +1,13 @@
+{
+  "permissions": {
+    "allow": [
+      "WebFetch(domain:www.tradera.com)",
+      "WebSearch",
+      "WebFetch(domain:tradera.com)",
+      "Bash(curl *)",
+      "Bash(python -m pip install -r requirements.txt --quiet)",
+      "Bash(python -m pytest tests/test_parser.py -v)",
+      "Bash(python -c ' *)"
+    ]
+  }
+}

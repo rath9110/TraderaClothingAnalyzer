@@ -7,7 +7,9 @@
       "Bash(curl *)",
       "Bash(python -m pip install -r requirements.txt --quiet)",
       "Bash(python -m pytest tests/test_parser.py -v)",
-      "Bash(python -c ' *)"
+      "Bash(python -c ' *)",
+      "Bash(python scripts/verify_categories.py)",
+      "Bash(python -m pytest tests/ -q)"
     ]
   }
 }

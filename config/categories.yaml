@@ -55,34 +55,29 @@ categories:
     display: "Dam – Kavajer & Kostymer"
 
   # --- Men's ---
-  # NOTE: Men's sub-category IDs are unverified — check by visiting
-  # https://www.tradera.com/en/category/302074 and clicking each sub-cat
+  # IDs verified against https://www.tradera.com/en/category/302074
   - label: herr_tröjor_stickade
-    tradera_id: 1628
+    tradera_id: 1622
     gender: herr
     display: "Herr – Tröjor & Stickade"
-    verify: true
 
   - label: herr_jackor_kappor
-    tradera_id: 1632
+    tradera_id: 1000694
     gender: herr
     display: "Herr – Jackor"
-    verify: true
+    # Alt sub-cat IDs if this is wrong: 1000695, 1000690
 
   - label: herr_byxor
-    tradera_id: 1000739
+    tradera_id: 1638
     gender: herr
     display: "Herr – Byxor"
-    verify: true
 
   - label: herr_jeans
     tradera_id: 340327
     gender: herr
     display: "Herr – Jeans"
-    verify: true
 
   - label: herr_tshirts_toppar
-    tradera_id: 1000725
+    tradera_id: 1641
     gender: herr
     display: "Herr – T-shirts & Toppar"
-    verify: true

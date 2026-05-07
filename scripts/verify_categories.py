@@ -56,7 +56,7 @@ def main() -> None:
                 url,
                 status_str,
                 listings_str,
-                "[yellow]⚠ Unverified[/yellow]" if cat.get("verify") else "[green]OK[/green]",
+                "[yellow]UNVERIFIED[/yellow]" if cat.get("verify") else "[green]OK[/green]",
             )
             time.sleep(2)
 

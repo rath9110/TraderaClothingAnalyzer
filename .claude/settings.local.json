@@ -9,7 +9,11 @@
       "Bash(python -m pytest tests/test_parser.py -v)",
       "Bash(python -c ' *)",
       "Bash(python scripts/verify_categories.py)",
-      "Bash(python -m pytest tests/ -q)"
+      "Bash(python -m pytest tests/ -q)",
+      "Bash(python -X utf8 run.py --cat dam_tröjor_stickade)",
+      "Bash(python -c \"import os; os.startfile\\(os.path.abspath\\('reports/2026-05-07.html'\\)\\)\")",
+      "Bash(python -X utf8 -c ' *)",
+      "Bash(python -X utf8 run.py --no-cache)"
     ]
   }
 }

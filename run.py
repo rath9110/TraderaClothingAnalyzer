@@ -38,7 +38,7 @@ def load_categories(path: Path = CATEGORIES_FILE) -> list[dict]:
     return data["categories"]
 
 
-def run_scrape(category_filter: str | None = None) -> int:
+def run_scrape(category_filter: str | None = None, no_cache: bool = False) -> int:
     categories = load_categories()
     if category_filter:
         categories = [c for c in categories if c["label"] == category_filter]
@@ -63,7 +63,7 @@ def run_scrape(category_filter: str | None = None) -> int:
 
     total_upserted = 0
 
-    with TraderaScraper() as scraper:
+    with TraderaScraper(use_cache=not no_cache) as scraper:
         for cat in categories:
             label = cat["label"]
             cat_id = cat["tradera_id"]
@@ -179,6 +179,7 @@ def main() -> None:
     parser.add_argument("--report", action="store_true", help="Generate report only (no scraping)")
     parser.add_argument("--audit", action="store_true", help="Run selector-drift audit on cached HTML")
     parser.add_argument("--cat", metavar="LABEL", help="Scrape a single category by label")
+    parser.add_argument("--no-cache", action="store_true", help="Bypass cached HTML; force fresh fetches")
     args = parser.parse_args()
 
     if args.audit:
@@ -186,7 +187,7 @@ def main() -> None:
     elif args.report:
         run_report()
     else:
-        run_scrape(category_filter=args.cat)
+        run_scrape(category_filter=args.cat, no_cache=args.no_cache)
         run_report()
 
 

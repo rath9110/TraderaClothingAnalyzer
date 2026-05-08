@@ -33,9 +33,14 @@ def test_extract_size_none():
 
 
 def test_parse_price():
+    # Swedish kr format
     assert parse_price("360 kr") == 360
     assert parse_price("1 200 kr") == 1200
     assert parse_price("50kr") == 50
+    # English /en/ pages use SEK with non-breaking space
+    assert parse_price("220\xa0SEK") == 220
+    assert parse_price("1\xa0530\xa0SEK") == 1530
+    assert parse_price("Price:99\xa0SEK,.") == 99
     assert parse_price("") is None
     assert parse_price("Gratis") is None
 
@@ -73,4 +78,7 @@ def test_parse_end_date_idag():
 
 def test_parse_end_date_none():
     assert parse_end_date("") is None
+    # "Ended" / "Avslutad" indicate ended without a parseable date
     assert parse_end_date("Avslutad") is None
+    assert parse_end_date("Ended") is None
+    assert parse_end_date("ended") is None

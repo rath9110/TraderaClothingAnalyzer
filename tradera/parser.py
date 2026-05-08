@@ -33,7 +33,9 @@ RE_LETTER = re.compile(_LETTER_SIZES, re.IGNORECASE)
 RE_STL = re.compile(_STL_SIZES, re.IGNORECASE)
 RE_NUMERIC = re.compile(_NUMERIC_SIZES)
 RE_JEANS = re.compile(_JEANS_SIZES)
-RE_PRICE = re.compile(r"([\d\s]+)\s*kr", re.IGNORECASE)
+# Tradera prices appear as "220 SEK" (with U+00A0 non-breaking space) on /en/ pages
+# and as "220 kr" on /sv/ pages.  Match either, with any whitespace separator.
+RE_PRICE = re.compile(r"([\d][\d\s ]*)\s*(?:SEK|kr)\b", re.IGNORECASE)
 RE_BIDS = re.compile(r"(\d+)\s*bud", re.IGNORECASE)
 
 
@@ -123,20 +125,23 @@ def parse_bid_count(bids_text: str) -> tuple[Optional[int], int]:
 
 def parse_end_date(end_text: str) -> Optional[str]:
     """
-    Parse Swedish end-date strings from Tradera listing cards.
+    Parse end-date strings from Tradera listing cards.
     Returns ISO date string (YYYY-MM-DD) or None.
 
-    Handles:
-      - "10 maj 23:10"   → today's year inferred
-      - "10 maj 2025"    → explicit year
-      - "Idag 15:30"     → today
-      - "Igår 12:00"     → yesterday
+    On Tradera's `?itemStatus=Ended` listings, the time element shows just
+    "Ended" with no exact date — return None and let the caller fall back to
+    scraped_at.  Active-auction cards do show "10 maj 23:10" / "10 May 14:43"
+    style end times, which we still support for completeness.
     """
     if not end_text:
         return None
 
     text = end_text.lower().strip()
     today = date.today()
+
+    # No exact date available — caller substitutes scraped_at
+    if text in {"ended", "avslutad", "avslutades"}:
+        return None
 
     if text.startswith("idag"):
         return today.isoformat()
@@ -145,28 +150,28 @@ def parse_end_date(end_text: str) -> Optional[str]:
         from datetime import timedelta
         return (today - timedelta(days=1)).isoformat()
 
-    # Try "DD mon" or "DD mon HH:MM" or "DD mon YYYY"
+    # English month names (Tradera /en/ pages use these for active auctions)
+    en_months = {
+        "jan": 1, "feb": 2, "mar": 3, "apr": 4, "may": 5, "jun": 6,
+        "jul": 7, "aug": 8, "sep": 9, "oct": 10, "nov": 11, "dec": 12,
+    }
+
     m = re.search(
         r"(\d{1,2})\s+([a-zåäö]+)(?:\s+(\d{4})|\s+\d{2}:\d{2})?",
         text,
     )
     if m:
         day = int(m.group(1))
-        month_str = m.group(2)[:3]  # first 3 chars
+        month_str = m.group(2)[:3]
         year = int(m.group(3)) if m.group(3) else None
-        month = SWEDISH_MONTHS.get(month_str)
+        month = SWEDISH_MONTHS.get(month_str) or en_months.get(month_str)
         if not month:
             return None
 
-        if not year:
-            # Infer year: if that month/day is in the future, use last year
-            candidate = date(today.year, month, day)
-            if candidate > today:
-                year = today.year - 1
-            else:
-                year = today.year
-
         try:
+            if not year:
+                candidate = date(today.year, month, day)
+                year = today.year - 1 if candidate > today else today.year
             return date(year, month, day).isoformat()
         except ValueError:
             return None
@@ -177,11 +182,24 @@ def parse_end_date(end_text: str) -> Optional[str]:
 def normalize_item(raw: dict, brand_matcher: BrandMatcher) -> dict:
     """
     Convert a raw scraper dict into a normalized DB-ready record.
+
+    For Tradera's `?itemStatus=Ended` filter, all returned items are sold
+    (had_bids = 1 by definition).  ended_at falls back to today's date when
+    the listing card only shows "Ended" without a specific date.
     """
     title = raw.get("title") or raw.get("raw_title") or ""
     price_sek = parse_price(raw.get("price_text", ""))
-    bid_count, had_bids = parse_bid_count(raw.get("bids_text", ""))
+    bid_count, _ = parse_bid_count(raw.get("bids_text", ""))
+
     ended_at = parse_end_date(raw.get("end_text", ""))
+    if ended_at is None:
+        # Listing card showed "Ended" with no date, or PureBin items with no
+        # time node — fall back to today (the scrape date).
+        ended_at = date.today().isoformat()
+
+    # Items returned under ?itemStatus=Ended are sold by definition of the
+    # filter; trust price presence as the signal.
+    had_bids = 1 if price_sek else 0
 
     return {
         "tradera_id": raw["tradera_id"],

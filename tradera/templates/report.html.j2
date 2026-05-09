@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Tradera Velocity – Week {{ week }}, {{ generated_at }}</title>
+  <title>Velocity – Week {{ week }}, {{ generated_at }}</title>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css">
   <link rel="stylesheet" href="https://cdn.datatables.net/1.13.8/css/dataTables.bootstrap5.min.css">
   <link rel="stylesheet" href="https://cdn.datatables.net/buttons/2.4.2/css/buttons.bootstrap5.min.css">
@@ -13,9 +13,14 @@
     .badge-med   { background: #ffc107; color: #000; }
     .badge-low   { background: #dc3545; color: #fff; }
     .badge-dim   { background: #6c757d; color: #fff; }
-    .top-pick-row td:first-child { font-weight: 600; }
+    .channel-tradera { background: #cfe2ff; color: #084298; padding: 1px 8px; border-radius: 10px; font-size: .75rem; font-weight: 600; }
+    .channel-vinted  { background: #f8d7da; color: #842029; padding: 1px 8px; border-radius: 10px; font-size: .75rem; font-weight: 600; }
+    .delta-positive  { color: #198754; font-weight: 600; }
+    .delta-negative  { color: #dc3545; font-weight: 600; }
     th { white-space: nowrap; }
     .stat-card { border-left: 4px solid #0d6efd; padding: .75rem 1rem; background: #f8f9fa; border-radius: 4px; }
+    .stat-card.tradera { border-left-color: #084298; }
+    .stat-card.vinted  { border-left-color: #842029; }
   </style>
 </head>
 <body class="bg-white">
@@ -24,51 +29,95 @@
   <!-- Header -->
   <div class="d-flex justify-content-between align-items-start mb-4">
     <div>
-      <h2 class="mb-0">Tradera Velocity Report</h2>
-      <small class="text-muted">Week {{ week }} · Generated {{ generated_at }} · Rolling 90-day window</small>
+      <h2 class="mb-0">Velocity Report</h2>
+      <small class="text-muted">Week {{ week }} · Generated {{ generated_at }} · 90-day rolling window</small>
     </div>
     <div class="d-flex gap-3">
-      <div class="stat-card text-center">
-        <div class="fs-4 fw-bold text-primary">{{ total_items }}</div>
-        <div class="text-muted" style="font-size:.75rem">items analysed</div>
+      <div class="stat-card tradera text-center">
+        <div class="fs-4 fw-bold">{{ total_tradera }}</div>
+        <div class="text-muted" style="font-size:.75rem">Tradera (sold)</div>
+      </div>
+      <div class="stat-card vinted text-center">
+        <div class="fs-4 fw-bold">{{ total_vinted }}</div>
+        <div class="text-muted" style="font-size:.75rem">Vinted (active)</div>
       </div>
       <div class="stat-card text-center">
-        <div class="fs-4 fw-bold text-primary">{{ brand_count }}</div>
+        <div class="fs-4 fw-bold">{{ brand_count }}</div>
         <div class="text-muted" style="font-size:.75rem">brands matched</div>
-      </div>
-      <div class="stat-card text-center">
-        <div class="fs-4 fw-bold text-primary">{{ all_cells | length }}</div>
-        <div class="text-muted" style="font-size:.75rem">cells (brand×cat×size)</div>
       </div>
     </div>
   </div>
 
-  <!-- ── Top 20 Sourcing Picks ── -->
+  <!-- ── Cross-Channel Comparison ── -->
   <div class="card mb-5 border-0 shadow-sm">
-    <div class="card-header bg-primary text-white">
-      <strong>Top 20 Sourcing Picks</strong>
-      <span class="ms-2 badge bg-light text-dark" style="font-weight:400">
-        n ≥ 5 sold · ranked by realised value (n × median price)
+    <div class="card-header bg-dark text-white d-flex align-items-center justify-content-between">
+      <strong>Cross-Channel Comparison</strong>
+      <span class="text-light" style="font-size:.8rem">
+        Tradera realized vs Vinted asking · sorted by largest |Δ%|
       </span>
     </div>
     <div class="card-body p-0">
       <table class="table table-hover table-sm mb-0">
         <thead class="table-light">
           <tr>
-            <th>#</th>
             <th>Brand</th>
             <th>Category</th>
-            <th>Size</th>
-            <th>Sold (n)</th>
-            <th>Median price (SEK)</th>
-            <th>p25 – p75</th>
-            <th>Total value (kSEK)</th>
+            <th>Tradera n</th>
+            <th>Tradera median (kr)</th>
+            <th>Vinted n</th>
+            <th>Vinted median (kr)</th>
+            <th>Δ kr</th>
+            <th>Δ %</th>
+            <th>Premium channel</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for r in cross_channel %}
+          <tr>
+            <td>{{ r.brand }}</td>
+            <td><small>{{ r.category }}</small></td>
+            <td>{{ r.tradera_n }}</td>
+            <td>{{ r.tradera_avg }}</td>
+            <td>{{ r.vinted_n }}</td>
+            <td>{{ r.vinted_avg }}</td>
+            <td class="{% if r.delta_sek > 0 %}delta-positive{% else %}delta-negative{% endif %}">
+              {{ r.delta_sek }}
+            </td>
+            <td class="{% if r.delta_pct > 0 %}delta-positive{% else %}delta-negative{% endif %}">
+              {{ r.delta_pct }}%
+            </td>
+            <td><span class="channel-{{ r.premium_channel }}">{{ r.premium_channel }}</span></td>
+          </tr>
+          {% else %}
+          <tr><td colspan="9" class="text-center text-muted py-3">No brand×category cells with both channels yet — add Vinted scrape coverage.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- ── Top 20 Sourcing Picks (combined) ── -->
+  <div class="card mb-5 border-0 shadow-sm">
+    <div class="card-header bg-primary text-white">
+      <strong>Top 20 Sourcing Picks</strong>
+      <span class="ms-2 badge bg-light text-dark" style="font-weight:400">
+        n ≥ 5 · ranked by realised value (n × median price), per channel
+      </span>
+    </div>
+    <div class="card-body p-0">
+      <table class="table table-hover table-sm mb-0">
+        <thead class="table-light">
+          <tr>
+            <th>#</th><th>Channel</th><th>Brand</th><th>Category</th><th>Size</th>
+            <th>n</th><th>Median (kr)</th><th>p25 – p75</th><th>Total (kSEK)</th>
+            <th>Cycle time</th>
           </tr>
         </thead>
         <tbody>
           {% for cell in top_picks %}
-          <tr class="top-pick-row">
+          <tr>
             <td class="text-muted">{{ loop.index }}</td>
+            <td><span class="channel-{{ cell.channel }}">{{ cell.channel }}</span></td>
             <td>{{ cell.brand }}</td>
             <td><small>{{ cell.category }}</small></td>
             <td>{{ cell.size }}</td>
@@ -79,14 +128,47 @@
                 <small class="text-muted">{{ cell.p25_sek }} – {{ cell.p75_sek }}</small>
               {% else %}–{% endif %}
             </td>
+            <td><span class="badge rounded-pill badge-{{ cell.velocity_class }}">{{ cell.velocity_score }}</span></td>
             <td>
-              <span class="badge rounded-pill badge-{{ cell.velocity_class }}">
-                {{ cell.velocity_score }}
-              </span>
+              {% if cell.median_time_to_sell %}{{ cell.median_time_to_sell }} d{% else %}<small class="text-muted">–</small>{% endif %}
             </td>
           </tr>
           {% else %}
-          <tr><td colspan="8" class="text-center text-muted py-3">No data yet — run a scrape first.</td></tr>
+          <tr><td colspan="10" class="text-center text-muted py-3">No data yet.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- ── Vinted Cycle-Time Insights ── -->
+  <div class="card mb-5 border-0 shadow-sm">
+    <div class="card-header bg-secondary text-white d-flex align-items-center justify-content-between">
+      <strong>Vinted Cycle-Time Insights</strong>
+      <span class="text-light" style="font-size:.8rem">Items disappeared between runs → presumed sold</span>
+    </div>
+    <div class="card-body p-0">
+      <table class="table table-sm mb-0">
+        <thead class="table-light">
+          <tr>
+            <th>Brand</th><th>Category</th><th>Size</th><th>Sold (n)</th>
+            <th>Avg days listed</th><th>Avg price (kr)</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for r in cycle_time %}
+          <tr>
+            <td>{{ r.brand }}</td>
+            <td><small>{{ r.category }}</small></td>
+            <td>{{ r.size }}</td>
+            <td>{{ r.n_sold }}</td>
+            <td>{{ r.avg_days }}</td>
+            <td>{{ r.avg_price }}</td>
+          </tr>
+          {% else %}
+          <tr><td colspan="6" class="text-center text-muted py-3">
+            No cycle-time data yet — populates after items first scraped this week disappear from later weekly runs (need 2+ runs to start, 4+ weeks for confidence).
+          </td></tr>
           {% endfor %}
         </tbody>
       </table>
@@ -97,25 +179,21 @@
   <div class="card border-0 shadow-sm">
     <div class="card-header">
       <strong>Full Analysis</strong>
-      <span class="ms-2 text-muted" style="font-size:.8rem">All brand × category × size cells · low-confidence (n&lt;5) shown in grey</span>
+      <span class="ms-2 text-muted" style="font-size:.8rem">All brand × category × size × channel cells</span>
     </div>
     <div class="card-body">
       <table id="full-table" class="table table-sm table-striped" style="width:100%">
         <thead>
           <tr>
-            <th>Brand</th>
-            <th>Category</th>
-            <th>Size</th>
-            <th>Sold (n)</th>
-            <th>Median SEK</th>
-            <th>p25</th>
-            <th>p75</th>
-            <th>Total kSEK</th>
+            <th>Channel</th><th>Brand</th><th>Category</th><th>Size</th>
+            <th>n</th><th>Median (kr)</th><th>p25</th><th>p75</th>
+            <th>Total kSEK</th><th>Cycle (d)</th>
           </tr>
         </thead>
         <tbody>
           {% for cell in all_cells %}
           <tr {% if cell.low_confidence %}class="text-muted"{% endif %}>
+            <td><span class="channel-{{ cell.channel }}">{{ cell.channel }}</span></td>
             <td>{{ cell.brand }}</td>
             <td><small>{{ cell.category }}</small></td>
             <td>{{ cell.size }}</td>
@@ -123,11 +201,8 @@
             <td>{% if cell.median_price_sek %}{{ cell.median_price_sek }}{% else %}–{% endif %}</td>
             <td>{% if cell.p25_sek %}{{ cell.p25_sek }}{% else %}–{% endif %}</td>
             <td>{% if cell.p75_sek %}{{ cell.p75_sek }}{% else %}–{% endif %}</td>
-            <td>
-              <span class="badge rounded-pill {% if cell.low_confidence %}badge-dim{% else %}badge-{{ cell.velocity_class }}{% endif %}">
-                {{ cell.velocity_score }}
-              </span>
-            </td>
+            <td><span class="badge rounded-pill {% if cell.low_confidence %}badge-dim{% else %}badge-{{ cell.velocity_class }}{% endif %}">{{ cell.velocity_score }}</span></td>
+            <td>{% if cell.median_time_to_sell %}{{ cell.median_time_to_sell }}{% else %}<small class="text-muted">–</small>{% endif %}</td>
           </tr>
           {% endfor %}
         </tbody>
@@ -136,10 +211,11 @@
   </div>
 
   <p class="text-muted mt-4" style="font-size:.75rem">
-    Velocity score = total realised sale value (n × median price), in kSEK.
-    Tradera's <code>?itemStatus=Ended</code> filter exposes sold items only — sell-through is not computable from this feed.
-    Cells with n&lt;5 are low-confidence and excluded from Top 20.
-    End dates are approximated from scrape time since the listing card shows only "Ended" without an exact date.
+    Tradera prices are <strong>realised</strong> sale prices (final auction bid). Vinted prices are <strong>asking</strong>
+    prices on active listings (Vinted = fixed-price marketplace; asking ≈ transaction when an item sells).
+    Cross-channel Δ% indicates expected price premium per side.
+    Cycle time is inferred longitudinally — items present in one weekly run and absent in the next are treated as sold.
+    Cells with n&lt;5 are low-confidence (greyed) and excluded from cross-channel comparisons and Top 20.
   </p>
 </div>
 
@@ -155,12 +231,10 @@
 $(document).ready(function () {
   $('#full-table').DataTable({
     pageLength: 50,
-    order: [[7, 'desc']],
+    order: [[8, 'desc']],
     dom: '<"d-flex justify-content-between align-items-center mb-2"<"d-flex gap-2"Bf><l>>rtip',
     buttons: [{ extend: 'csvHtml5', text: 'Export CSV', className: 'btn btn-sm btn-outline-secondary' }],
-    columnDefs: [
-      { targets: [3,4,5,6,7], className: 'text-end' }
-    ]
+    columnDefs: [{ targets: [4,5,6,7,8,9], className: 'text-end' }]
   });
 });
 </script>

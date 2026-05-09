@@ -201,8 +201,10 @@ def normalize_item(raw: dict, brand_matcher: BrandMatcher) -> dict:
     # filter; trust price presence as the signal.
     had_bids = 1 if price_sek else 0
 
+    today_iso = date.today().isoformat()
     return {
         "tradera_id": raw["tradera_id"],
+        "channel": "tradera",
         "url": raw.get("url"),
         "title": title,
         "raw_title": title,
@@ -211,9 +213,13 @@ def normalize_item(raw: dict, brand_matcher: BrandMatcher) -> dict:
         "size": extract_size(title),
         "item_type": raw.get("item_type", "Auction"),
         "final_price_sek": price_sek,
+        "listed_price_sek": None,
         "bid_count": bid_count,
         "had_bids": had_bids,
         "ended_at": ended_at,
+        "first_seen_at": today_iso,
+        "last_seen_at": today_iso,
+        "time_to_sell_days": None,
         "tradera_category_id": raw.get("tradera_category_id"),
         "scraped_at": datetime.utcnow().isoformat(),
     }

@@ -15,7 +15,9 @@
       "Bash(python -X utf8 -c ' *)",
       "Bash(python -X utf8 run.py --no-cache)",
       "Bash(python -c \"import os; os.startfile\\(os.path.abspath\\('reports/2026-05-08.html'\\)\\)\")",
-      "WebFetch(domain:www.vinted.se)"
+      "WebFetch(domain:www.vinted.se)",
+      "Bash(python -X utf8 run.py --channel vinted --cat dam_tröjor_stickade)",
+      "Bash(python -X utf8 run.py --channel vinted)"
     ]
   }
 }

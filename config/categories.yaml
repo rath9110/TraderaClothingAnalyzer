@@ -1,71 +1,83 @@
-# Tradera category IDs mapped to our internal sub-category labels
-# Source: https://www.tradera.com/en/category/302073 (women's) and /302074 (men's)
-# Verify IDs by visiting: https://www.tradera.com/en/category/<ID>
+# Tradera and Vinted category mapping.
+# Each row maps an internal label to platform-specific IDs.
+# `tradera_id`: required — the Tradera category ID
+# `vinted_id`:  optional — the Vinted category ID (omit if Vinted has no
+#               equivalent or the category is too coarse to match)
 
 categories:
   # --- Women's ---
-  - label: dam_tröjor_stickade        # sweaters / knitwear
+  - label: dam_tröjor_stickade
     tradera_id: 1629
+    vinted_id: 13
+    vinted_slug: jumpers-and-sweaters
     gender: dam
     display: "Dam – Tröjor & Stickade"
 
-  - label: dam_jackor_kappor          # jackets / coats
+  - label: dam_jackor_kappor
     tradera_id: 1633
+    vinted_id: 1037
+    vinted_slug: coats-and-jackets
     gender: dam
     display: "Dam – Jackor & Kappor"
 
-  - label: dam_klänningar             # dresses
+  - label: dam_klänningar
     tradera_id: 301741
+    vinted_id: 10
+    vinted_slug: dresses
     gender: dam
     display: "Dam – Klänningar"
 
-  - label: dam_toppar                 # tops
+  - label: dam_toppar
     tradera_id: 1000724
     gender: dam
     display: "Dam – Toppar"
 
-  - label: dam_blusar                 # blouses
+  - label: dam_blusar
     tradera_id: 1000726
     gender: dam
     display: "Dam – Blusar"
 
-  - label: dam_byxor                  # trousers
+  - label: dam_byxor
     tradera_id: 1000738
     gender: dam
     display: "Dam – Byxor"
 
-  - label: dam_jeans                  # jeans
+  - label: dam_jeans
     tradera_id: 340326
+    vinted_id: 183
+    vinted_slug: jeans
     gender: dam
     display: "Dam – Jeans"
 
-  - label: dam_kjolar                 # skirts
+  - label: dam_kjolar
     tradera_id: 1001282
     gender: dam
     display: "Dam – Kjolar"
 
-  - label: dam_skjortor               # shirts
+  - label: dam_skjortor
     tradera_id: 1630
     gender: dam
     display: "Dam – Skjortor"
 
-  - label: dam_kavajer_kostymer       # blazers / suits
+  - label: dam_kavajer_kostymer
     tradera_id: 340295
     gender: dam
     display: "Dam – Kavajer & Kostymer"
 
   # --- Men's ---
-  # IDs verified against https://www.tradera.com/en/category/302074
   - label: herr_tröjor_stickade
     tradera_id: 1622
+    vinted_id: 79
+    vinted_slug: jumpers-and-sweaters
     gender: herr
     display: "Herr – Tröjor & Stickade"
 
   - label: herr_jackor_kappor
     tradera_id: 1000694
+    vinted_id: 1206
+    vinted_slug: coats-and-jackets
     gender: herr
     display: "Herr – Jackor"
-    # Alt sub-cat IDs if this is wrong: 1000695, 1000690
 
   - label: herr_byxor
     tradera_id: 1638
@@ -74,6 +86,8 @@ categories:
 
   - label: herr_jeans
     tradera_id: 340327
+    vinted_id: 257
+    vinted_slug: jeans
     gender: herr
     display: "Herr – Jeans"
 

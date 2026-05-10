@@ -91,11 +91,11 @@ def build_lookups(conn: sqlite3.Connection, lookback_days: int = LOOKBACK_DAYS) 
             key = "|".join(str(d[f]) for f in fields)
             buckets[code][key].append(price)
 
+    # Keep entries at all sample sizes — predict_price decides whether to
+    # surface them as high-confidence (n ≥ MIN_N) or low-confidence fallbacks.
     out: dict[str, dict[str, dict]] = {code: {} for code, _ in LOOKUP_LEVELS}
     for code, group in buckets.items():
         for key, prices in group.items():
-            if len(prices) < MIN_N:
-                continue
             s = sorted(prices)
             n = len(s)
             out[code][key] = {
@@ -116,9 +116,12 @@ def predict_price(
     condition: Optional[str] = None,
 ) -> Optional[dict]:
     """
-    Walk the fallback ladder; return first match with n >= MIN_N or None.
-    Condition-aware levels are tried first when `condition` is provided,
-    then condition-agnostic fallbacks.
+    Walk the fallback ladder twice:
+      Pass 1 — high confidence: only return matches with n ≥ MIN_N.
+      Pass 2 — low confidence:  accept any match with n ≥ 1.
+    The result includes `confidence` ('high' or 'low') so callers can mark
+    low-confidence predictions visually.  Returns None only if no data exists
+    at any granularity.
     """
     inputs = {
         "brand": brand,
@@ -128,18 +131,19 @@ def predict_price(
         "condition": condition,
     }
 
-    for code, fields in LOOKUP_LEVELS:
-        # Skip condition-aware levels if no condition supplied
-        if "condition" in fields and not condition:
-            continue
-        key = "|".join(inputs[f] for f in fields)
-        entry = lookups[code].get(key)
-        if entry:
-            return {
-                **entry,
-                "granularity": code,
-                "granularity_label": LEVEL_LABELS[code],
-            }
+    for required_n, confidence in ((MIN_N, "high"), (1, "low")):
+        for code, fields in LOOKUP_LEVELS:
+            if "condition" in fields and not condition:
+                continue
+            key = "|".join(inputs[f] for f in fields)
+            entry = lookups[code].get(key)
+            if entry and entry["n"] >= required_n:
+                return {
+                    **entry,
+                    "granularity": code,
+                    "granularity_label": LEVEL_LABELS[code],
+                    "confidence": confidence,
+                }
     return None
 
 

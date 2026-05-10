@@ -72,14 +72,39 @@ def test_returns_none_when_no_data_anywhere():
     assert r is None
 
 
-def test_below_threshold_excluded():
+def test_below_threshold_returns_low_confidence():
+    """Low-n cells now return a result with confidence='low' instead of None."""
     conn = _make_conn()
     # only 5 items, below MIN_N=10
     upsert_items_batch(conn, _items("Acne Studios", "dam_tröjor", "M", "tradera",
                                     [100] * 5))
     lookups = build_lookups(conn)
     r = predict_price("Acne Studios", "dam_tröjor", "M", "tradera", lookups)
-    assert r is None  # 5 < 10, no fallback either
+    assert r is not None
+    assert r["confidence"] == "low"
+    assert r["n"] == 5
+    assert r["median"] == 100
+
+
+def test_high_confidence_preferred_over_specificity():
+    """When a coarser level has n>=10 but the specific level has n<10,
+    we still prefer the SPECIFIC low-confidence match."""
+    conn = _make_conn()
+    # 5 items at brand+cat+size+channel (low conf, specific)
+    upsert_items_batch(conn, _items("Acne Studios", "dam_tröjor", "M", "tradera",
+                                    [100] * 5))
+    # 12 items at brand+cat+channel (high conf, less specific) — different size
+    upsert_items_batch(conn, _items("Acne Studios", "dam_tröjor", "L", "tradera",
+                                    [500] * 12))
+    lookups = build_lookups(conn)
+    # When asked for size M: pass 1 (n>=10) finds nothing at M, finds size-L
+    # at the bcsc level too — but bcsc keys differ by size, so M's bcsc has n=5,
+    # L's bcsc has n=12.  Pass 1 walks levels for the M key:
+    #   - bcsc(Acne|dam_tröjor|M|tradera) -> 5 items, fails MIN_N
+    #   - bcc(Acne|dam_tröjor|tradera) -> 17 items combined → high-conf hit
+    r = predict_price("Acne Studios", "dam_tröjor", "M", "tradera", lookups)
+    assert r["confidence"] == "high"
+    assert r["granularity"] == "bcc"  # fell back one level but stayed high-conf
 
 
 def test_channels_separated():

@@ -50,17 +50,28 @@
 
   <!-- ── Pricing Calculator ── -->
   <style>
-    .calc-low-data { color: #aaa; font-style: italic; }
-    .calc-no-data  { color: #bbb; font-style: italic; }
-    .result-box { border-radius: 6px; padding: 1rem; margin-bottom: .5rem; }
+    /* Three-tier dropdown contrast */
+    select option              { color: #212529; }                    /* normal: full visibility */
+    select option.calc-low-data { color: #888; font-style: italic; }   /* 1–9 samples: dimmed */
+    select option.calc-no-data  { color: #ccc; font-style: italic; }   /* 0 samples: very faded */
+
+    .result-box { border-radius: 6px; padding: 1rem; margin-bottom: .5rem; position: relative; }
     .result-box.tradera { background: #cfe2ff; }
     .result-box.vinted  { background: #f8d7da; }
     .result-box.empty   { background: #f1f3f5; }
+    .result-box.low-confidence { opacity: 0.85; border: 2px dashed #ffc107; }
     .result-box .price  { font-size: 2.2rem; font-weight: 700; line-height: 1; }
     .result-box .unit   { font-size: 1rem; font-weight: 400; }
     .result-box .channel-tag { font-size: .75rem; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; }
     .result-box .meta { font-size: .8rem; color: #555; margin-top: .25rem; }
     .result-box .gran { font-size: .7rem; color: #666; margin-top: .35rem; }
+    .result-box .confidence-badge {
+      position: absolute; top: .5rem; right: .75rem;
+      font-size: .65rem; font-weight: 700; text-transform: uppercase;
+      padding: 2px 8px; border-radius: 10px;
+    }
+    .result-box .confidence-badge.high { background: #198754; color: #fff; }
+    .result-box .confidence-badge.low  { background: #ffc107; color: #000; }
   </style>
 
   <div class="card mb-5 border-0 shadow-sm">
@@ -187,34 +198,42 @@
         channel:  channel,
         condition: cond,
       };
-      for (const lvl of LEVELS) {
-        if (lvl.needsCondition && !cond) continue;
-        const key = lvl.fields.map(f => inputs[f]).join('|');
-        const e = lookups[lvl.code] && lookups[lvl.code][key];
-        if (e) return { ...e, label: lvl.label, code: lvl.code };
+      // Two-pass: prefer high-confidence (n ≥ MIN_N); fall back to any n.
+      for (const [requiredN, conf] of [[MIN_N, 'high'], [1, 'low']]) {
+        for (const lvl of LEVELS) {
+          if (lvl.needsCondition && !cond) continue;
+          const key = lvl.fields.map(f => inputs[f]).join('|');
+          const e = lookups[lvl.code] && lookups[lvl.code][key];
+          if (e && e.n >= requiredN) {
+            return { ...e, label: lvl.label, code: lvl.code, confidence: conf };
+          }
+        }
       }
       return null;
     }
 
     function renderChannel(channel, result) {
       const box = document.querySelector(`.result-box[data-channel="${channel}"]`);
-      box.classList.remove('empty', 'tradera', 'vinted');
+      box.classList.remove('empty', 'tradera', 'vinted', 'low-confidence');
       if (!result) {
         box.classList.add('empty');
         box.innerHTML = `
           <div class="channel-tag text-muted">${channel}</div>
-          <div class="meta mt-2">Not enough data for this combination at any granularity (need n ≥ 10).</div>`;
+          <div class="meta mt-2">No samples for this combination at any granularity.</div>`;
         return;
       }
       box.classList.add(channel);
+      if (result.confidence === 'low') box.classList.add('low-confidence');
       const isFallback = result.code !== 'bcscZ' && result.code !== 'bcsc';
+      const confidenceLabel = result.confidence === 'low' ? 'low conf.' : 'n ≥ 10';
       box.innerHTML = `
+        <div class="confidence-badge ${result.confidence}">${confidenceLabel}</div>
         <div class="channel-tag">${channel}${channel === 'tradera' ? ' · realised' : ' · listed'}</div>
         <div class="d-flex align-items-baseline gap-2 mt-1">
           <div class="price">${result.median}<span class="unit"> kr</span></div>
           <div class="meta">range ${result.p25} – ${result.p75} kr · n=${result.n}</div>
         </div>
-        <div class="gran">Matched on ${result.label}${isFallback ? ' (fallback)' : ''}</div>`;
+        <div class="gran">Matched on ${result.label}${isFallback ? ' (fallback)' : ''}${result.confidence === 'low' ? ' · sample below n=10 threshold — treat as indicative' : ''}</div>`;
     }
 
     function predictBoth() {

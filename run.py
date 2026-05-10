@@ -154,13 +154,16 @@ def run_price(brand: str, category: str, size: str, channel: str, condition: str
     if not result:
         cond_str = f" / {condition}" if condition else ""
         console.print(
-            f"[yellow]No data for {brand} / {category} / {size or 'Unknown'}{cond_str} / {channel} "
-            "at any granularity (need n ≥ 10).[/yellow]"
+            f"[yellow]No samples for {brand} / {category} / {size or 'Unknown'}{cond_str} / {channel} "
+            "at any granularity.[/yellow]"
         )
         return
 
-    console.print(f"\n[bold green]{result['median']} kr[/bold green]"
-                  f"  [dim](range {result['p25']} – {result['p75']} kr, n={result['n']})[/dim]")
+    confidence = result.get("confidence", "high")
+    color = "green" if confidence == "high" else "yellow"
+    badge = "[green]n ≥ 10[/green]" if confidence == "high" else "[yellow]LOW CONF (n < 10)[/yellow]"
+    console.print(f"\n[bold {color}]{result['median']} kr[/bold {color}]"
+                  f"  [dim](range {result['p25']} – {result['p75']} kr, n={result['n']})[/dim]  {badge}")
     console.print(f"[dim]Matched on:[/dim] {result['granularity_label']}")
 
 

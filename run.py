@@ -138,6 +138,52 @@ def run_report() -> Path:
     return path
 
 
+def run_price(brand: str, category: str, size: str, channel: str, condition: str | None = None) -> None:
+    """CLI: estimate a price using the hierarchical lookup."""
+    from tradera.pricing import build_lookups, predict_price
+
+    conn = get_connection()
+    setup_db(conn)
+    lookups = build_lookups(conn)
+    conn.close()
+
+    if size.lower() in ("none", "null", "-"):
+        size = None
+    result = predict_price(brand, category, size, channel, lookups, condition=condition)
+
+    if not result:
+        cond_str = f" / {condition}" if condition else ""
+        console.print(
+            f"[yellow]No data for {brand} / {category} / {size or 'Unknown'}{cond_str} / {channel} "
+            "at any granularity (need n ≥ 10).[/yellow]"
+        )
+        return
+
+    console.print(f"\n[bold green]{result['median']} kr[/bold green]"
+                  f"  [dim](range {result['p25']} – {result['p75']} kr, n={result['n']})[/dim]")
+    console.print(f"[dim]Matched on:[/dim] {result['granularity_label']}")
+
+
+def run_backfill_conditions() -> None:
+    """Re-parse cached Vinted HTML and populate condition for existing rows."""
+    from tradera.vinted import backfill_conditions_from_cache
+
+    conn = get_connection()
+    setup_db(conn)
+    n_updated = backfill_conditions_from_cache(conn)
+    total_with_cond = conn.execute(
+        "SELECT COUNT(*) FROM items WHERE condition IS NOT NULL"
+    ).fetchone()[0]
+    total_vinted = conn.execute(
+        "SELECT COUNT(*) FROM items WHERE channel = 'vinted'"
+    ).fetchone()[0]
+    conn.close()
+    console.print(
+        f"[green]Backfilled condition on {n_updated} rows. "
+        f"Now {total_with_cond}/{total_vinted} Vinted items have a condition.[/green]"
+    )
+
+
 def run_audit() -> None:
     from tradera.scraper import CACHE_DIR
     import gzip
@@ -184,8 +230,25 @@ def main() -> None:
     parser.add_argument("--audit", action="store_true", help="Selector-drift audit")
     parser.add_argument("--cat", metavar="LABEL", help="Single category by label")
     parser.add_argument("--no-cache", action="store_true", help="Bypass cached HTML")
+    parser.add_argument(
+        "--price", nargs="+", metavar=("BRAND", "CATEGORY"),
+        help='Predict price: --price BRAND CATEGORY SIZE CHANNEL [CONDITION]',
+    )
+    parser.add_argument(
+        "--backfill-conditions", action="store_true",
+        help="Re-parse cached Vinted HTML to populate the new condition column",
+    )
     args = parser.parse_args()
 
+    if args.backfill_conditions:
+        run_backfill_conditions()
+        return
+    if args.price:
+        if len(args.price) not in (4, 5):
+            console.print("[red]--price expects 4 or 5 args: BRAND CATEGORY SIZE CHANNEL [CONDITION][/red]")
+            return
+        run_price(*args.price)
+        return
     if args.audit:
         run_audit()
         return

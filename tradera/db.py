@@ -51,6 +51,7 @@ MIGRATIONS = [
     ("items", "first_seen_at", "TEXT"),
     ("items", "last_seen_at", "TEXT"),
     ("items", "time_to_sell_days", "INTEGER"),
+    ("items", "condition", "TEXT"),
     ("scrape_runs", "channel", "TEXT"),
 ]
 
@@ -91,6 +92,7 @@ def upsert_item(conn: sqlite3.Connection, item: dict) -> None:
     item.setdefault("listed_price_sek", None)
     item.setdefault("time_to_sell_days", None)
     item.setdefault("channel", "tradera")
+    item.setdefault("condition", None)
     now = item.get("scraped_at")
     item.setdefault("first_seen_at", now)
     item.setdefault("last_seen_at", now)
@@ -99,14 +101,14 @@ def upsert_item(conn: sqlite3.Connection, item: dict) -> None:
         """
         INSERT INTO items (
             tradera_id, channel, url, title, raw_title, brand, category, size,
-            item_type, final_price_sek, listed_price_sek, bid_count, had_bids,
-            ended_at, first_seen_at, last_seen_at, time_to_sell_days,
-            tradera_category_id, scraped_at
+            condition, item_type, final_price_sek, listed_price_sek,
+            bid_count, had_bids, ended_at, first_seen_at, last_seen_at,
+            time_to_sell_days, tradera_category_id, scraped_at
         ) VALUES (
             :tradera_id, :channel, :url, :title, :raw_title, :brand, :category, :size,
-            :item_type, :final_price_sek, :listed_price_sek, :bid_count, :had_bids,
-            :ended_at, :first_seen_at, :last_seen_at, :time_to_sell_days,
-            :tradera_category_id, :scraped_at
+            :condition, :item_type, :final_price_sek, :listed_price_sek,
+            :bid_count, :had_bids, :ended_at, :first_seen_at, :last_seen_at,
+            :time_to_sell_days, :tradera_category_id, :scraped_at
         )
         ON CONFLICT(tradera_id) DO UPDATE SET
             channel          = excluded.channel,
@@ -115,6 +117,7 @@ def upsert_item(conn: sqlite3.Connection, item: dict) -> None:
             brand            = excluded.brand,
             category         = excluded.category,
             size             = excluded.size,
+            condition        = excluded.condition,
             item_type        = excluded.item_type,
             final_price_sek  = excluded.final_price_sek,
             listed_price_sek = excluded.listed_price_sek,

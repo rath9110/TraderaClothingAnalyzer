@@ -45,6 +45,33 @@ RE_VINTED_PRICE = re.compile(r"([\d\s]+)(?:[,.](\d{1,2}))?\s*kr", re.IGNORECASE)
 # Strict top-level item card testid: product-item-id-NNN  (no --suffix)
 RE_TOP_LEVEL_CARD = re.compile(r"^product-item-id-\d+$")
 
+# Vinted condition vocabulary (Swedish → canonical English).
+# Ordered roughly from new to worst; appears as the substring after " · "
+# in the item subtitle, e.g. "S / 36 / 8 · Mycket bra".
+VINTED_CONDITIONS = {
+    "ny med prislapp":   "NWT",        # New with tag
+    "ny utan prislapp":  "NWOT",       # New without tag
+    "mycket bra":        "VeryGood",
+    "bra":               "Good",
+    "tillfredsställande": "Fair",
+}
+
+
+def parse_vinted_condition(subtitle: str) -> Optional[str]:
+    """
+    Extract canonical condition code from a Vinted subtitle string.
+    Returns None if no recognised condition is found.
+
+    Examples:
+      "S / 36 / 8 · Mycket bra"   → "VeryGood"
+      "M · Ny med prislapp"        → "NWT"
+      "L"                          → None
+    """
+    if not subtitle or "·" not in subtitle:
+        return None
+    tail = subtitle.rsplit("·", 1)[-1].strip().lower()
+    return VINTED_CONDITIONS.get(tail)
+
 
 class VintedScraper:
     def __init__(self, cache_dir: Path = CACHE_DIR, use_cache: bool = True):
@@ -226,6 +253,7 @@ def normalize_vinted_item(raw: dict, brand_matcher: BrandMatcher) -> dict:
         "brand": brand,
         "category": raw.get("category_label"),
         "size": extract_size(raw.get("subtitle", "")) or extract_size(title),
+        "condition": parse_vinted_condition(raw.get("subtitle", "")),
         "item_type": "BuyNow",
         # Vinted is fixed-price: listing price = transaction price if it sells
         "final_price_sek": None,           # only set when item disappears (sold)
@@ -239,3 +267,37 @@ def normalize_vinted_item(raw: dict, brand_matcher: BrandMatcher) -> dict:
         "tradera_category_id": raw.get("tradera_category_id"),
         "scraped_at": now_iso,
     }
+
+
+def backfill_conditions_from_cache(conn, cache_dir: Path = CACHE_DIR) -> int:
+    """
+    Re-parse cached Vinted HTML and UPDATE the `condition` column for
+    existing rows.  Does NOT touch first_seen_at / last_seen_at — purely
+    a backfill of the new field.  Returns count updated.
+    """
+    files = sorted(cache_dir.glob("*.html.gz"))
+    if not files:
+        log.warning("No Vinted cache files found.")
+        return 0
+
+    updated = 0
+    for f in files:
+        with gzip.open(f, "rt", encoding="utf-8") as fh:
+            html = fh.read()
+        tree = HTMLParser(html)
+        for card in tree.css('[data-testid^="product-item-id-"]'):
+            tid = card.attributes.get("data-testid", "")
+            if not RE_TOP_LEVEL_CARD.match(tid):
+                continue
+            platform_id = tid.removeprefix("product-item-id-")
+            sub_node = card.css_first('[data-testid$="--description-subtitle"]')
+            subtitle = sub_node.text(strip=True) if sub_node else ""
+            condition = parse_vinted_condition(subtitle)
+            if condition:
+                cur = conn.execute(
+                    "UPDATE items SET condition = ? WHERE tradera_id = ? AND condition IS NULL",
+                    (condition, f"v{platform_id}"),
+                )
+                updated += cur.rowcount
+    conn.commit()
+    return updated

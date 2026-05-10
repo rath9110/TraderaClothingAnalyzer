@@ -48,6 +48,132 @@
     </div>
   </div>
 
+  <!-- ── Pricing Calculator ── -->
+  <div class="card mb-5 border-0 shadow-sm">
+    <div class="card-header bg-success text-white d-flex align-items-center justify-content-between">
+      <strong>Pricing Calculator</strong>
+      <span class="text-light" style="font-size:.8rem">
+        Hierarchical median lookup · falls back through 5 levels until n ≥ 10
+      </span>
+    </div>
+    <div class="card-body">
+      <div class="row g-2 mb-3">
+        <div class="col-md">
+          <label class="form-label small mb-1">Brand</label>
+          <select class="form-select form-select-sm" id="calc-brand">
+            {% for b in calc_brands %}<option value="{{ b }}">{{ b }}</option>{% endfor %}
+          </select>
+        </div>
+        <div class="col-md">
+          <label class="form-label small mb-1">Category</label>
+          <select class="form-select form-select-sm" id="calc-category">
+            {% for c in calc_categories %}<option value="{{ c }}">{{ c }}</option>{% endfor %}
+          </select>
+        </div>
+        <div class="col-md">
+          <label class="form-label small mb-1">Size</label>
+          <select class="form-select form-select-sm" id="calc-size">
+            {% for s in calc_sizes %}<option value="{{ s }}">{{ s }}</option>{% endfor %}
+          </select>
+        </div>
+        <div class="col-md">
+          <label class="form-label small mb-1">Condition</label>
+          <select class="form-select form-select-sm" id="calc-condition">
+            <option value="">Any (use any-condition fallback)</option>
+            {% for cond in calc_conditions %}<option value="{{ cond }}">{{ cond }}</option>{% endfor %}
+          </select>
+        </div>
+        <div class="col-md">
+          <label class="form-label small mb-1">Channel</label>
+          <select class="form-select form-select-sm" id="calc-channel">
+            {% for c in calc_channels %}<option value="{{ c }}">{{ c }}</option>{% endfor %}
+          </select>
+        </div>
+        <div class="col-md-auto d-flex align-items-end">
+          <button class="btn btn-success btn-sm" id="calc-go" type="button">Estimate</button>
+        </div>
+      </div>
+      <div id="calc-result"></div>
+
+      <details class="mt-3">
+        <summary class="text-muted" style="font-size:.8rem; cursor:pointer">
+          Coverage by granularity ·
+          {{ pricing_coverage.bcscZ + pricing_coverage.bcsc }} brand×cat×size cells
+          ({{ pricing_coverage.bcscZ }} condition-aware),
+          {{ pricing_coverage.bcc }} brand×cat,
+          {{ pricing_coverage.bch }} brand×ch,
+          {{ pricing_coverage.csc }} cat×size,
+          {{ pricing_coverage.cc }} cat×ch
+        </summary>
+        <p class="text-muted mt-2" style="font-size:.75rem">
+          The calculator returns the most-specific match with n ≥ 10. When you supply a condition,
+          condition-aware levels are tried first; if none have enough samples, it falls through to
+          condition-agnostic fallbacks. Condition data is currently Vinted-only — Tradera ended-auction
+          cards don't expose it.
+        </p>
+      </details>
+    </div>
+  </div>
+
+  <script type="application/json" id="pricing-lookups">{{ pricing_lookups_json | safe }}</script>
+  <script>
+  (function () {
+    const lookups = JSON.parse(document.getElementById('pricing-lookups').textContent);
+    // Condition-aware levels first (only used when condition is supplied),
+    // then condition-agnostic fallbacks.
+    const LEVELS = [
+      { code: 'bcscZ', fields: ['brand','category','size','channel','condition'], label: 'brand × cat × size × channel × condition', needsCondition: true },
+      { code: 'bccZ',  fields: ['brand','category','channel','condition'],         label: 'brand × cat × channel × condition',        needsCondition: true },
+      { code: 'bchZ',  fields: ['brand','channel','condition'],                    label: 'brand × channel × condition',              needsCondition: true },
+      { code: 'cscZ',  fields: ['category','size','channel','condition'],          label: 'cat × size × channel × condition',         needsCondition: true },
+      { code: 'ccZ',   fields: ['category','channel','condition'],                 label: 'cat × channel × condition',                needsCondition: true },
+      { code: 'bcsc',  fields: ['brand','category','size','channel'],              label: 'brand × cat × size × channel' },
+      { code: 'bcc',   fields: ['brand','category','channel'],                     label: 'brand × cat × channel' },
+      { code: 'bch',   fields: ['brand','channel'],                                label: 'brand × channel' },
+      { code: 'csc',   fields: ['category','size','channel'],                      label: 'cat × size × channel' },
+      { code: 'cc',    fields: ['category','channel'],                             label: 'cat × channel' },
+    ];
+    const $ = id => document.getElementById(id);
+
+    function predict() {
+      const cond = $('calc-condition').value;
+      const inputs = {
+        brand:    $('calc-brand').value,
+        category: $('calc-category').value,
+        size:     $('calc-size').value || 'Unknown',
+        channel:  $('calc-channel').value,
+        condition: cond,
+      };
+      for (const lvl of LEVELS) {
+        if (lvl.needsCondition && !cond) continue;
+        const key = lvl.fields.map(f => inputs[f]).join('|');
+        const e = lookups[lvl.code] && lookups[lvl.code][key];
+        if (e) {
+          const isFallback = lvl.code !== 'bcscZ' && lvl.code !== 'bcsc';
+          $('calc-result').innerHTML = `
+            <div class="alert alert-success mb-0">
+              <div class="d-flex align-items-baseline gap-3">
+                <div style="font-size:2rem; font-weight:700">${e.median}<span style="font-size:1rem; font-weight:400"> kr</span></div>
+                <div class="text-muted">range ${e.p25} – ${e.p75} kr · n=${e.n}</div>
+              </div>
+              <small class="text-muted">Matched on ${lvl.label}${isFallback ? ' (fallback)' : ''}</small>
+            </div>`;
+          return;
+        }
+      }
+      const condStr = cond ? ` / ${cond}` : '';
+      $('calc-result').innerHTML = `
+        <div class="alert alert-warning mb-0">
+          No data for <code>${inputs.brand} / ${inputs.category} / ${inputs.size}${condStr} / ${inputs.channel}</code>
+          at any granularity (need n ≥ 10). Try a different size, a more common brand, or the other channel.
+        </div>`;
+    }
+
+    $('calc-go').addEventListener('click', predict);
+    predict();
+  })();
+  </script>
+
   <!-- ── Cross-Channel Comparison ── -->
   <div class="card mb-5 border-0 shadow-sm">
     <div class="card-header bg-dark text-white d-flex align-items-center justify-content-between">

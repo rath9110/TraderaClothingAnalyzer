@@ -1,4 +1,5 @@
 """Generate the weekly HTML velocity report from the SQLite database."""
+import json
 import math
 import statistics
 import sqlite3
@@ -8,6 +9,8 @@ from pathlib import Path
 from typing import Optional
 
 import jinja2
+
+from tradera.pricing import build_lookups, get_distinct_values
 
 TEMPLATE_DIR = Path(__file__).parent / "templates"
 REPORTS_DIR = Path("reports")
@@ -167,6 +170,8 @@ def generate_report(conn: sqlite3.Connection, output_path: Optional[Path] = None
     cells = compute_metrics(conn)
     cross_channel = compute_cross_channel(cells)
     cycle_time = compute_cycle_time_insights(conn)
+    pricing_lookups = build_lookups(conn)
+    distincts = get_distinct_values(conn)
 
     top_picks = [c for c in cells if not c["low_confidence"]][:20]
 
@@ -179,6 +184,9 @@ def generate_report(conn: sqlite3.Connection, output_path: Optional[Path] = None
     brand_count = conn.execute(
         "SELECT COUNT(DISTINCT brand) FROM items WHERE brand IS NOT NULL"
     ).fetchone()[0]
+
+    # Total cells with usable data per level — surfaces calculator coverage.
+    pricing_coverage = {level: len(table) for level, table in pricing_lookups.items()}
 
     for c in cells:
         c["velocity_class"] = _velocity_class(c["velocity_score"])
@@ -199,6 +207,13 @@ def generate_report(conn: sqlite3.Connection, output_path: Optional[Path] = None
         all_cells=cells,
         cross_channel=cross_channel,
         cycle_time=cycle_time,
+        pricing_lookups_json=json.dumps(pricing_lookups),
+        pricing_coverage=pricing_coverage,
+        calc_brands=distincts["brands"],
+        calc_categories=distincts["categories"],
+        calc_sizes=distincts["sizes"],
+        calc_channels=distincts["channels"],
+        calc_conditions=distincts["conditions"],
     )
 
     REPORTS_DIR.mkdir(parents=True, exist_ok=True)

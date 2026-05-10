@@ -10,7 +10,7 @@ from typing import Optional
 
 import jinja2
 
-from tradera.pricing import build_lookups, get_distinct_values
+from tradera.pricing import build_lookups, build_cascade_index, get_distinct_values
 
 TEMPLATE_DIR = Path(__file__).parent / "templates"
 REPORTS_DIR = Path("reports")
@@ -171,6 +171,7 @@ def generate_report(conn: sqlite3.Connection, output_path: Optional[Path] = None
     cross_channel = compute_cross_channel(cells)
     cycle_time = compute_cycle_time_insights(conn)
     pricing_lookups = build_lookups(conn)
+    cascade = build_cascade_index(conn)
     distincts = get_distinct_values(conn)
 
     top_picks = [c for c in cells if not c["low_confidence"]][:20]
@@ -208,6 +209,7 @@ def generate_report(conn: sqlite3.Connection, output_path: Optional[Path] = None
         cross_channel=cross_channel,
         cycle_time=cycle_time,
         pricing_lookups_json=json.dumps(pricing_lookups),
+        cascade_json=json.dumps(cascade),
         pricing_coverage=pricing_coverage,
         calc_brands=distincts["brands"],
         calc_categories=distincts["categories"],

@@ -25,7 +25,9 @@
       "Bash(python -c \"import os; os.startfile\\(os.path.abspath\\('reports/2026-05-10.html'\\)\\)\")",
       "Bash(python -X utf8 run.py --backfill-conditions)",
       "Bash(python -X utf8 run.py --price \"Acne Studios\" dam_tröjor_stickade M vinted VeryGood)",
-      "Bash(python -X utf8 run.py --price \"Acne Studios\" dam_tröjor_stickade M vinted NWT)"
+      "Bash(python -X utf8 run.py --price \"Acne Studios\" dam_tröjor_stickade M vinted NWT)",
+      "Bash(awk '{print \"Report size: \" $5 \" bytes \\(\" int\\($5/1024\\) \" KB\\)\"}')",
+      "Bash(awk '{print \"Report: \" int\\($5/1024\\) \" KB\"}')"
     ]
   }
 }

@@ -143,6 +143,73 @@ def predict_price(
     return None
 
 
+MIN_BRAND_TOTAL = 3  # drop brands with fewer than this many items across both channels
+
+
+def build_cascade_index(conn: sqlite3.Connection, lookback_days: int = LOOKBACK_DAYS) -> dict:
+    """
+    Pre-compute counts for cascading dropdowns: pick brand → narrow category
+    options → narrow size options → narrow condition options.  Each option
+    carries (n_tradera, n_vinted) so the UI can grey out low-data choices.
+
+    Brands with fewer than MIN_BRAND_TOTAL items across both channels are
+    filtered out — they're useless for pricing and bloat the embedded JSON.
+    """
+    from collections import defaultdict
+
+    rows = conn.execute(
+        """
+        SELECT brand, category, size, channel, condition, COUNT(*) AS n
+        FROM items
+        WHERE brand IS NOT NULL AND category IS NOT NULL
+          AND (
+            (channel = 'tradera' AND ended_at >= date('now', ? || ' days'))
+         OR (channel = 'vinted'  AND last_seen_at >= date('now', ? || ' days'))
+          )
+        GROUP BY brand, category, size, channel, condition
+        """,
+        (f"-{lookback_days}", f"-{lookback_days}"),
+    ).fetchall()
+
+    nest = lambda: defaultdict(lambda: defaultdict(int))
+    brand_n        = defaultdict(lambda: defaultdict(int))
+    cat_by_b       = defaultdict(nest)
+    size_by_bc     = defaultdict(nest)
+    cond_by_bcs    = defaultdict(nest)
+
+    for r in rows:
+        b = r["brand"]; c = r["category"]; s = r["size"] or "Unknown"
+        ch = r["channel"]; cond = r["condition"]; n = r["n"]
+
+        brand_n[b][ch]                       += n
+        cat_by_b[b][c][ch]                   += n
+        size_by_bc[f"{b}|{c}"][s][ch]        += n
+        if cond:
+            cond_by_bcs[f"{b}|{c}|{s}"][cond][ch] += n
+
+    def options_list(by_ch_dict):
+        out = []
+        for value, by_ch in by_ch_dict.items():
+            n_t = by_ch.get("tradera", 0)
+            n_v = by_ch.get("vinted", 0)
+            out.append({"value": value, "n_tradera": n_t, "n_vinted": n_v, "total": n_t + n_v})
+        out.sort(key=lambda x: -x["total"])
+        return out
+
+    # Filter brands below MIN_BRAND_TOTAL — singletons can't produce predictions
+    # and they bloat the embedded JSON enormously (1098 of 1530 are singletons).
+    brand_options = [b for b in options_list(brand_n) if b["total"] >= MIN_BRAND_TOTAL]
+    kept_brands = {b["value"] for b in brand_options}
+
+    return {
+        "brands": brand_options,
+        "cats_by_brand":      {b: options_list(d) for b, d in cat_by_b.items() if b in kept_brands},
+        "sizes_by_bc":        {k: options_list(d) for k, d in size_by_bc.items() if k.split("|", 1)[0] in kept_brands},
+        "conds_by_bcs":       {k: options_list(d) for k, d in cond_by_bcs.items() if k.split("|", 1)[0] in kept_brands},
+        "min_n": MIN_N,
+    }
+
+
 def get_distinct_values(conn: sqlite3.Connection, lookback_days: int = LOOKBACK_DAYS) -> dict:
     """Distinct dropdown values for the report's calculator form."""
     base_where = """

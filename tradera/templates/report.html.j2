@@ -49,78 +49,75 @@
   </div>
 
   <!-- ── Pricing Calculator ── -->
+  <style>
+    .calc-low-data { color: #aaa; font-style: italic; }
+    .calc-no-data  { color: #bbb; font-style: italic; }
+    .result-box { border-radius: 6px; padding: 1rem; margin-bottom: .5rem; }
+    .result-box.tradera { background: #cfe2ff; }
+    .result-box.vinted  { background: #f8d7da; }
+    .result-box.empty   { background: #f1f3f5; }
+    .result-box .price  { font-size: 2.2rem; font-weight: 700; line-height: 1; }
+    .result-box .unit   { font-size: 1rem; font-weight: 400; }
+    .result-box .channel-tag { font-size: .75rem; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; }
+    .result-box .meta { font-size: .8rem; color: #555; margin-top: .25rem; }
+    .result-box .gran { font-size: .7rem; color: #666; margin-top: .35rem; }
+  </style>
+
   <div class="card mb-5 border-0 shadow-sm">
     <div class="card-header bg-success text-white d-flex align-items-center justify-content-between">
       <strong>Pricing Calculator</strong>
       <span class="text-light" style="font-size:.8rem">
-        Hierarchical median lookup · falls back through 5 levels until n ≥ 10
+        Cascading filters · grayed options have &lt; 10 samples
       </span>
     </div>
     <div class="card-body">
       <div class="row g-2 mb-3">
-        <div class="col-md">
+        <div class="col-md-3">
           <label class="form-label small mb-1">Brand</label>
-          <select class="form-select form-select-sm" id="calc-brand">
-            {% for b in calc_brands %}<option value="{{ b }}">{{ b }}</option>{% endfor %}
-          </select>
+          <select class="form-select form-select-sm" id="calc-brand"></select>
         </div>
-        <div class="col-md">
+        <div class="col-md-3">
           <label class="form-label small mb-1">Category</label>
-          <select class="form-select form-select-sm" id="calc-category">
-            {% for c in calc_categories %}<option value="{{ c }}">{{ c }}</option>{% endfor %}
-          </select>
+          <select class="form-select form-select-sm" id="calc-category"></select>
         </div>
-        <div class="col-md">
+        <div class="col-md-3">
           <label class="form-label small mb-1">Size</label>
-          <select class="form-select form-select-sm" id="calc-size">
-            {% for s in calc_sizes %}<option value="{{ s }}">{{ s }}</option>{% endfor %}
-          </select>
+          <select class="form-select form-select-sm" id="calc-size"></select>
         </div>
-        <div class="col-md">
-          <label class="form-label small mb-1">Condition</label>
+        <div class="col-md-3">
+          <label class="form-label small mb-1">Condition <small class="text-muted">(Vinted only)</small></label>
           <select class="form-select form-select-sm" id="calc-condition">
-            <option value="">Any (use any-condition fallback)</option>
-            {% for cond in calc_conditions %}<option value="{{ cond }}">{{ cond }}</option>{% endfor %}
+            <option value="">Any (no condition filter)</option>
           </select>
-        </div>
-        <div class="col-md">
-          <label class="form-label small mb-1">Channel</label>
-          <select class="form-select form-select-sm" id="calc-channel">
-            {% for c in calc_channels %}<option value="{{ c }}">{{ c }}</option>{% endfor %}
-          </select>
-        </div>
-        <div class="col-md-auto d-flex align-items-end">
-          <button class="btn btn-success btn-sm" id="calc-go" type="button">Estimate</button>
         </div>
       </div>
-      <div id="calc-result"></div>
+
+      <div class="row g-3" id="calc-result">
+        <div class="col-md-6"><div class="result-box empty" data-channel="tradera">Loading…</div></div>
+        <div class="col-md-6"><div class="result-box empty" data-channel="vinted">Loading…</div></div>
+      </div>
 
       <details class="mt-3">
-        <summary class="text-muted" style="font-size:.8rem; cursor:pointer">
-          Coverage by granularity ·
-          {{ pricing_coverage.bcscZ + pricing_coverage.bcsc }} brand×cat×size cells
-          ({{ pricing_coverage.bcscZ }} condition-aware),
-          {{ pricing_coverage.bcc }} brand×cat,
-          {{ pricing_coverage.bch }} brand×ch,
-          {{ pricing_coverage.csc }} cat×size,
-          {{ pricing_coverage.cc }} cat×ch
-        </summary>
+        <summary class="text-muted" style="font-size:.8rem; cursor:pointer">How this works</summary>
         <p class="text-muted mt-2" style="font-size:.75rem">
-          The calculator returns the most-specific match with n ≥ 10. When you supply a condition,
-          condition-aware levels are tried first; if none have enough samples, it falls through to
-          condition-agnostic fallbacks. Condition data is currently Vinted-only — Tradera ended-auction
-          cards don't expose it.
+          Pick brand → category → size → condition. Each dropdown shows what's available given prior choices,
+          with sample sizes per channel <code>(T:tradera V:vinted)</code>. Options below the n≥10 threshold are grayed.
+          The result panel shows both channels at once. If a cell has too few samples at the chosen specificity,
+          the calculator falls back through coarser levels (brand×cat → brand-only → cat-only) and labels the match.
+          Condition data is Vinted-only — for Tradera the condition field always falls through to condition-agnostic levels.
         </p>
       </details>
     </div>
   </div>
 
   <script type="application/json" id="pricing-lookups">{{ pricing_lookups_json | safe }}</script>
+  <script type="application/json" id="cascade-data">{{ cascade_json | safe }}</script>
   <script>
   (function () {
     const lookups = JSON.parse(document.getElementById('pricing-lookups').textContent);
-    // Condition-aware levels first (only used when condition is supplied),
-    // then condition-agnostic fallbacks.
+    const cascade = JSON.parse(document.getElementById('cascade-data').textContent);
+    const MIN_N = cascade.min_n;
+
     const LEVELS = [
       { code: 'bcscZ', fields: ['brand','category','size','channel','condition'], label: 'brand × cat × size × channel × condition', needsCondition: true },
       { code: 'bccZ',  fields: ['brand','category','channel','condition'],         label: 'brand × cat × channel × condition',        needsCondition: true },
@@ -135,42 +132,113 @@
     ];
     const $ = id => document.getElementById(id);
 
-    function predict() {
+    function makeOption(item) {
+      const opt = document.createElement('option');
+      opt.value = item.value;
+      opt.textContent = `${item.value}  (T:${item.n_tradera} V:${item.n_vinted})`;
+      if (item.total === 0) {
+        opt.classList.add('calc-no-data');
+        opt.disabled = true;
+      } else if (item.total < MIN_N) {
+        opt.classList.add('calc-low-data');
+      }
+      return opt;
+    }
+
+    function fillSelect(selectEl, items, placeholderIfEmpty) {
+      selectEl.innerHTML = '';
+      if (!items || items.length === 0) {
+        const opt = document.createElement('option');
+        opt.value = '';
+        opt.textContent = placeholderIfEmpty;
+        opt.disabled = true;
+        selectEl.appendChild(opt);
+        return;
+      }
+      items.forEach(it => selectEl.appendChild(makeOption(it)));
+    }
+
+    function refreshCategories() {
+      const brand = $('calc-brand').value;
+      fillSelect($('calc-category'), cascade.cats_by_brand[brand], '— no categories for this brand —');
+    }
+    function refreshSizes() {
+      const key = `${$('calc-brand').value}|${$('calc-category').value}`;
+      fillSelect($('calc-size'), cascade.sizes_by_bc[key], '— no sizes for this brand × category —');
+    }
+    function refreshConditions() {
+      const key = `${$('calc-brand').value}|${$('calc-category').value}|${$('calc-size').value || 'Unknown'}`;
+      const conds = cascade.conds_by_bcs[key] || [];
+      const sel = $('calc-condition');
+      sel.innerHTML = '';
+      const blank = document.createElement('option');
+      blank.value = '';
+      blank.textContent = 'Any (no condition filter)';
+      sel.appendChild(blank);
+      conds.forEach(it => sel.appendChild(makeOption(it)));
+    }
+
+    function predictForChannel(channel) {
       const cond = $('calc-condition').value;
       const inputs = {
         brand:    $('calc-brand').value,
         category: $('calc-category').value,
         size:     $('calc-size').value || 'Unknown',
-        channel:  $('calc-channel').value,
+        channel:  channel,
         condition: cond,
       };
       for (const lvl of LEVELS) {
         if (lvl.needsCondition && !cond) continue;
         const key = lvl.fields.map(f => inputs[f]).join('|');
         const e = lookups[lvl.code] && lookups[lvl.code][key];
-        if (e) {
-          const isFallback = lvl.code !== 'bcscZ' && lvl.code !== 'bcsc';
-          $('calc-result').innerHTML = `
-            <div class="alert alert-success mb-0">
-              <div class="d-flex align-items-baseline gap-3">
-                <div style="font-size:2rem; font-weight:700">${e.median}<span style="font-size:1rem; font-weight:400"> kr</span></div>
-                <div class="text-muted">range ${e.p25} – ${e.p75} kr · n=${e.n}</div>
-              </div>
-              <small class="text-muted">Matched on ${lvl.label}${isFallback ? ' (fallback)' : ''}</small>
-            </div>`;
-          return;
-        }
+        if (e) return { ...e, label: lvl.label, code: lvl.code };
       }
-      const condStr = cond ? ` / ${cond}` : '';
-      $('calc-result').innerHTML = `
-        <div class="alert alert-warning mb-0">
-          No data for <code>${inputs.brand} / ${inputs.category} / ${inputs.size}${condStr} / ${inputs.channel}</code>
-          at any granularity (need n ≥ 10). Try a different size, a more common brand, or the other channel.
-        </div>`;
+      return null;
     }
 
-    $('calc-go').addEventListener('click', predict);
-    predict();
+    function renderChannel(channel, result) {
+      const box = document.querySelector(`.result-box[data-channel="${channel}"]`);
+      box.classList.remove('empty', 'tradera', 'vinted');
+      if (!result) {
+        box.classList.add('empty');
+        box.innerHTML = `
+          <div class="channel-tag text-muted">${channel}</div>
+          <div class="meta mt-2">Not enough data for this combination at any granularity (need n ≥ 10).</div>`;
+        return;
+      }
+      box.classList.add(channel);
+      const isFallback = result.code !== 'bcscZ' && result.code !== 'bcsc';
+      box.innerHTML = `
+        <div class="channel-tag">${channel}${channel === 'tradera' ? ' · realised' : ' · listed'}</div>
+        <div class="d-flex align-items-baseline gap-2 mt-1">
+          <div class="price">${result.median}<span class="unit"> kr</span></div>
+          <div class="meta">range ${result.p25} – ${result.p75} kr · n=${result.n}</div>
+        </div>
+        <div class="gran">Matched on ${result.label}${isFallback ? ' (fallback)' : ''}</div>`;
+    }
+
+    function predictBoth() {
+      renderChannel('tradera', predictForChannel('tradera'));
+      renderChannel('vinted',  predictForChannel('vinted'));
+    }
+
+    // Cascade wiring
+    fillSelect($('calc-brand'), cascade.brands, '— no data —');
+    refreshCategories();
+    refreshSizes();
+    refreshConditions();
+    predictBoth();
+
+    $('calc-brand').addEventListener('change', () => {
+      refreshCategories(); refreshSizes(); refreshConditions(); predictBoth();
+    });
+    $('calc-category').addEventListener('change', () => {
+      refreshSizes(); refreshConditions(); predictBoth();
+    });
+    $('calc-size').addEventListener('change', () => {
+      refreshConditions(); predictBoth();
+    });
+    $('calc-condition').addEventListener('change', predictBoth);
   })();
   </script>
 

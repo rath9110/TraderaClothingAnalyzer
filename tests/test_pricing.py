@@ -86,25 +86,22 @@ def test_below_threshold_returns_low_confidence():
     assert r["median"] == 100
 
 
-def test_high_confidence_preferred_over_specificity():
-    """When a coarser level has n>=10 but the specific level has n<10,
-    we still prefer the SPECIFIC low-confidence match."""
+def test_specificity_preferred_over_confidence():
+    """The most specific level with any data is returned, even if n < MIN_N.
+    A broader bucket with higher n is only used when the specific level is empty."""
     conn = _make_conn()
-    # 5 items at brand+cat+size+channel (low conf, specific)
+    # 5 items at brand+cat+size M (low conf, specific)
     upsert_items_batch(conn, _items("Acne Studios", "dam_tröjor", "M", "tradera",
                                     [100] * 5))
-    # 12 items at brand+cat+channel (high conf, less specific) — different size
+    # 12 items at brand+cat+size L (contributes to bcc aggregate but different bcsc key)
     upsert_items_batch(conn, _items("Acne Studios", "dam_tröjor", "L", "tradera",
                                     [500] * 12))
     lookups = build_lookups(conn)
-    # When asked for size M: pass 1 (n>=10) finds nothing at M, finds size-L
-    # at the bcsc level too — but bcsc keys differ by size, so M's bcsc has n=5,
-    # L's bcsc has n=12.  Pass 1 walks levels for the M key:
-    #   - bcsc(Acne|dam_tröjor|M|tradera) -> 5 items, fails MIN_N
-    #   - bcc(Acne|dam_tröjor|tradera) -> 17 items combined → high-conf hit
+    # bcsc(M) has n=5 → returned immediately as low-confidence, never falls to bcc
     r = predict_price("Acne Studios", "dam_tröjor", "M", "tradera", lookups)
-    assert r["confidence"] == "high"
-    assert r["granularity"] == "bcc"  # fell back one level but stayed high-conf
+    assert r["confidence"] == "low"
+    assert r["granularity"] == "bcsc"
+    assert r["median"] == 100
 
 
 def test_channels_separated():
@@ -140,8 +137,9 @@ def test_condition_aware_match_preferred():
     assert vg_pred["median"] == 200
 
 
-def test_condition_falls_back_to_agnostic():
-    """When the requested condition has too few samples, fall back to no-condition level."""
+def test_condition_low_confidence_shown():
+    """When the requested condition has too few samples (n < MIN_N but n >= 1),
+    return its data as low-confidence rather than falling to a condition-agnostic level."""
     conn = _make_conn()
     # Only 3 NWT items (below MIN_N), but 12 VeryGood
     nwt = _items("Acne Studios", "dam_tröjor", "M", "vinted", [400] * 3)
@@ -153,9 +151,10 @@ def test_condition_falls_back_to_agnostic():
 
     lookups = build_lookups(conn)
     r = predict_price("Acne Studios", "dam_tröjor", "M", "vinted", lookups, condition="NWT")
-    # NWT has only 3 → no condition-aware level qualifies → falls to bcsc
-    assert r["granularity"] == "bcsc"
-    assert r["median"] == 200  # the no-condition median (dominated by VeryGood)
+    # NWT bcscZ has n=3 → returned as low-confidence with the NWT median
+    assert r["granularity"] == "bcscZ"
+    assert r["confidence"] == "low"
+    assert r["median"] == 400
 
 
 def test_parse_vinted_condition():

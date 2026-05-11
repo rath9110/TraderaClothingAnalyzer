@@ -116,12 +116,11 @@ def predict_price(
     condition: Optional[str] = None,
 ) -> Optional[dict]:
     """
-    Walk the fallback ladder twice:
-      Pass 1 — high confidence: only return matches with n ≥ MIN_N.
-      Pass 2 — low confidence:  accept any match with n ≥ 1.
-    The result includes `confidence` ('high' or 'low') so callers can mark
-    low-confidence predictions visually.  Returns None only if no data exists
-    at any granularity.
+    Walk the fallback ladder from most specific to least specific and return
+    the first level that has any data (n ≥ 1).  Specificity is always preferred
+    over sample-size confidence: if the exact (brand×cat×size×channel) bucket
+    has 3 items, return those 3 items marked 'low' rather than a broader bucket
+    with n ≥ 10.  Returns None only when no data exists at any granularity.
     """
     inputs = {
         "brand": brand,
@@ -131,19 +130,19 @@ def predict_price(
         "condition": condition,
     }
 
-    for required_n, confidence in ((MIN_N, "high"), (1, "low")):
-        for code, fields in LOOKUP_LEVELS:
-            if "condition" in fields and not condition:
-                continue
-            key = "|".join(inputs[f] for f in fields)
-            entry = lookups[code].get(key)
-            if entry and entry["n"] >= required_n:
-                return {
-                    **entry,
-                    "granularity": code,
-                    "granularity_label": LEVEL_LABELS[code],
-                    "confidence": confidence,
-                }
+    for code, fields in LOOKUP_LEVELS:
+        if "condition" in fields and not condition:
+            continue
+        key = "|".join(inputs[f] for f in fields)
+        entry = lookups[code].get(key)
+        if entry and entry["n"] >= 1:
+            confidence = "high" if entry["n"] >= MIN_N else "low"
+            return {
+                **entry,
+                "granularity": code,
+                "granularity_label": LEVEL_LABELS[code],
+                "confidence": confidence,
+            }
     return None
 
 

@@ -85,7 +85,16 @@
       <div class="row g-2 mb-3">
         <div class="col-md-3">
           <label class="form-label small mb-1">Brand</label>
-          <select class="form-select form-select-sm" id="calc-brand"></select>
+          <div class="position-relative">
+            <input type="text" class="form-control form-control-sm" id="calc-brand-input"
+                   placeholder="Type to search brand…" autocomplete="off" spellcheck="false">
+            <ul id="brand-dropdown"
+                style="display:none;position:absolute;top:100%;left:0;right:0;z-index:1050;
+                       max-height:220px;overflow-y:auto;margin:0;padding:0;list-style:none;
+                       background:#fff;border:1px solid #ced4da;border-radius:0 0 4px 4px;
+                       box-shadow:0 4px 10px rgba(0,0,0,.12)"></ul>
+          </div>
+          <select id="calc-brand" style="display:none"></select>
         </div>
         <div class="col-md-3">
           <label class="form-label small mb-1">Category</label>
@@ -198,15 +207,15 @@
         channel:  channel,
         condition: cond,
       };
-      // Two-pass: prefer high-confidence (n ≥ MIN_N); fall back to any n.
-      for (const [requiredN, conf] of [[MIN_N, 'high'], [1, 'low']]) {
-        for (const lvl of LEVELS) {
-          if (lvl.needsCondition && !cond) continue;
-          const key = lvl.fields.map(f => inputs[f]).join('|');
-          const e = lookups[lvl.code] && lookups[lvl.code][key];
-          if (e && e.n >= requiredN) {
-            return { ...e, label: lvl.label, code: lvl.code, confidence: conf };
-          }
+      // Prefer specificity: return the first level that has any data (n ≥ 1).
+      // A specific low-n result beats a broader high-n fallback.
+      for (const lvl of LEVELS) {
+        if (lvl.needsCondition && !cond) continue;
+        const key = lvl.fields.map(f => inputs[f]).join('|');
+        const e = lookups[lvl.code] && lookups[lvl.code][key];
+        if (e && e.n >= 1) {
+          return { ...e, label: lvl.label, code: lvl.code,
+                   confidence: e.n >= MIN_N ? 'high' : 'low' };
         }
       }
       return null;
@@ -241,16 +250,101 @@
       renderChannel('vinted',  predictForChannel('vinted'));
     }
 
-    // Cascade wiring
+    // ── Brand combobox ──────────────────────────────────────────────────────
+    // Brands sorted alphabetically; sample counts shown in dropdown items.
     fillSelect($('calc-brand'), cascade.brands, '— no data —');
+
+    const allBrands = (cascade.brands || [])
+      .slice()
+      .sort((a, b) => a.value.localeCompare(b.value, 'sv'));
+
+    const brandInput    = document.getElementById('calc-brand-input');
+    const brandDropdown = document.getElementById('brand-dropdown');
+    const brandSelect   = $('calc-brand');
+
+    let committedBrand = '';
+
+    function applyBrand(value) {
+      committedBrand    = value;
+      brandSelect.value = value;
+      brandInput.value  = value;
+      brandDropdown.style.display = 'none';
+      refreshCategories(); refreshSizes(); refreshConditions(); predictBoth();
+    }
+
+    function renderBrandDropdown(query) {
+      const q = query.trim().toLowerCase();
+      const matches = q
+        ? allBrands.filter(b => b.value.toLowerCase().includes(q))
+        : allBrands;
+      brandDropdown.innerHTML = '';
+      if (!matches.length) {
+        const li = document.createElement('li');
+        li.textContent = 'No matching brands';
+        li.style.cssText = 'padding:6px 10px;color:#888;font-size:.8rem';
+        brandDropdown.appendChild(li);
+      } else {
+        matches.forEach(b => {
+          const li = document.createElement('li');
+          const conf = b.total >= MIN_N ? '' : b.total === 0 ? 'color:#bbb' : 'color:#888;font-style:italic';
+          li.style.cssText = `padding:5px 10px;cursor:pointer;font-size:.85rem;${conf}`;
+          li.textContent = `${b.value}  (T:${b.n_tradera} V:${b.n_vinted})`;
+          li.dataset.value = b.value;
+          li.addEventListener('mousedown', e => { e.preventDefault(); applyBrand(b.value); });
+          li.addEventListener('mouseover', () => { li.style.background = '#e9ecef'; });
+          li.addEventListener('mouseout',  () => { li.style.background = ''; });
+          brandDropdown.appendChild(li);
+        });
+      }
+      brandDropdown.style.display = '';
+    }
+
+    brandInput.addEventListener('input', () => renderBrandDropdown(brandInput.value));
+    brandInput.addEventListener('focus', () => {
+      brandInput.value = '';           // clear so user can type from scratch
+      renderBrandDropdown('');         // show full sorted list
+    });
+    brandInput.addEventListener('blur',  () => {
+      // Restore the committed brand name (or blank if nothing selected yet)
+      setTimeout(() => {
+        brandDropdown.style.display = 'none';
+        brandInput.value = committedBrand;
+      }, 150);
+    });
+    brandInput.addEventListener('keydown', e => {
+      const items = brandDropdown.querySelectorAll('li[data-value]');
+      const active = brandDropdown.querySelector('li.active');
+      if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        const next = active ? active.nextElementSibling : items[0];
+        if (active) active.classList.remove('active'), active.style.background = '';
+        if (next) { next.classList.add('active'); next.style.background = '#e9ecef'; next.scrollIntoView({block:'nearest'}); }
+      } else if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        const prev = active ? active.previousElementSibling : items[items.length - 1];
+        if (active) active.classList.remove('active'), active.style.background = '';
+        if (prev) { prev.classList.add('active'); prev.style.background = '#e9ecef'; prev.scrollIntoView({block:'nearest'}); }
+      } else if (e.key === 'Enter' && active) {
+        e.preventDefault();
+        applyBrand(active.dataset.value);
+      } else if (e.key === 'Escape') {
+        brandDropdown.style.display = 'none';
+      }
+    });
+
+    // Seed with first brand so page loads with a result
+    if (allBrands.length) {
+      const firstSorted  = allBrands[0].value;
+      committedBrand     = firstSorted;
+      brandSelect.value  = firstSorted;
+      brandInput.value   = firstSorted;
+    }
+    // ── End brand combobox ───────────────────────────────────────────────────
+
     refreshCategories();
     refreshSizes();
     refreshConditions();
     predictBoth();
-
-    $('calc-brand').addEventListener('change', () => {
-      refreshCategories(); refreshSizes(); refreshConditions(); predictBoth();
-    });
     $('calc-category').addEventListener('change', () => {
       refreshSizes(); refreshConditions(); predictBoth();
     });

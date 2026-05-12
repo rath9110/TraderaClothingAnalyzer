@@ -355,6 +355,66 @@
   })();
   </script>
 
+  <!-- ── Flip Scanner ── -->
+  <style>
+    .disc-high { color: #198754; font-weight: 700; }
+    .disc-mid  { color: #e67e00; font-weight: 600; }
+  </style>
+  <div class="card mb-5 border-0 shadow-sm">
+    <div class="card-header bg-danger text-white d-flex align-items-center justify-content-between">
+      <strong>Flip Scanner</strong>
+      <span class="text-light" style="font-size:.8rem">
+        Active Vinted listings priced ≥20% below Tradera realized median &middot; gross margin before fees &amp; shipping
+      </span>
+    </div>
+    <div class="card-body">
+      <table id="flip-table" class="table table-sm table-hover" style="width:100%">
+        <thead>
+          <tr>
+            <th>Brand</th><th>Category</th><th>Size</th><th>Condition</th>
+            <th>Vinted (kr)</th><th>Tradera median</th>
+            <th>Discount</th><th>Gross margin (kr)</th>
+            <th>Days listed</th><th>Link</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for opp in flip_opps %}
+          <tr>
+            <td>{{ opp.brand }}</td>
+            <td><small>{{ opp.category }}</small></td>
+            <td>{{ opp.size }}</td>
+            <td><small>{{ opp.condition }}</small></td>
+            <td class="text-end">{{ opp.vinted_price }}</td>
+            <td class="text-end">
+              {{ opp.tradera_median }}
+              <small class="text-muted ms-1">n={{ opp.tradera_n }}</small>
+              {% if opp.tradera_confidence == 'low' %}
+              <span style="font-size:.6rem;background:#ffc107;color:#000;padding:1px 5px;border-radius:8px;font-weight:700">~</span>
+              {% endif %}
+            </td>
+            <td class="text-end">
+              <span class="{% if opp.discount_pct >= 40 %}disc-high{% elif opp.discount_pct >= 25 %}disc-mid{% endif %}">
+                {{ opp.discount_pct }}%
+              </span>
+            </td>
+            <td class="text-end fw-semibold">{{ opp.gross_margin }}</td>
+            <td class="text-end">{{ opp.days_listed if opp.days_listed is not none else '–' }}</td>
+            <td>
+              <a href="{{ opp.url }}" target="_blank" rel="noopener"
+                 class="btn btn-outline-danger btn-sm py-0 px-2" style="font-size:.75rem">View</a>
+            </td>
+          </tr>
+          {% else %}
+          <tr><td colspan="10" class="text-center text-muted py-3">
+            No flip opportunities found — run a Vinted scrape to populate active listings,
+            or lower the 20% discount threshold in <code>compute_flip_opportunities</code>.
+          </td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
   <!-- ── Cross-Channel Comparison ── -->
   <div class="card mb-5 border-0 shadow-sm">
     <div class="card-header bg-dark text-white d-flex align-items-center justify-content-between">
@@ -536,6 +596,16 @@
 <script src="https://cdn.datatables.net/buttons/2.4.2/js/buttons.html5.min.js"></script>
 <script>
 $(document).ready(function () {
+  $('#flip-table').DataTable({
+    pageLength: 25,
+    order: [[6, 'desc']],
+    dom: '<"d-flex justify-content-between align-items-center mb-2"<"d-flex gap-2"Bf><l>>rtip',
+    buttons: [{ extend: 'csvHtml5', text: 'Export CSV', className: 'btn btn-sm btn-outline-secondary' }],
+    columnDefs: [
+      { targets: [4,5,6,7,8], className: 'text-end' },
+      { targets: [9], orderable: false }
+    ]
+  });
   $('#full-table').DataTable({
     pageLength: 50,
     order: [[8, 'desc']],

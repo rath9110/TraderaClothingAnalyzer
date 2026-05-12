@@ -10,7 +10,7 @@ from typing import Optional
 
 import jinja2
 
-from tradera.pricing import build_lookups, build_cascade_index, get_distinct_values
+from tradera.pricing import build_lookups, build_cascade_index, get_distinct_values, predict_price
 
 TEMPLATE_DIR = Path(__file__).parent / "templates"
 REPORTS_DIR = Path("reports")
@@ -166,11 +166,83 @@ def compute_cycle_time_insights(conn: sqlite3.Connection, lookback_days: int = 9
     return [dict(r) for r in rows]
 
 
+def compute_flip_opportunities(
+    conn: sqlite3.Connection,
+    lookups: dict,
+    min_discount_pct: float = 20.0,
+    min_tradera_n: int = 3,
+    max_rows: int = 50,
+) -> list[dict]:
+    """
+    Active Vinted listings whose asking price is at least min_discount_pct%
+    below the Tradera realized median for the same brand / category / size.
+    Only rows where the Tradera reference has at least min_tradera_n samples.
+    """
+    rows = conn.execute(
+        """
+        SELECT url, title, brand, category, size, condition,
+               listed_price_sek, first_seen_at
+        FROM items
+        WHERE channel = 'vinted'
+          AND time_to_sell_days IS NULL
+          AND listed_price_sek IS NOT NULL AND listed_price_sek > 0
+          AND brand IS NOT NULL AND brand != 'vet ej'
+          AND category IS NOT NULL
+        """
+    ).fetchall()
+
+    today = date.today()
+    opps = []
+
+    for row in rows:
+        r = dict(row)
+        pred = predict_price(r["brand"], r["category"], r["size"], "tradera", lookups)
+        if not pred or pred["n"] < min_tradera_n:
+            continue
+
+        vinted_price = r["listed_price_sek"]
+        tradera_median = pred["median"]
+        if tradera_median <= 0 or vinted_price >= tradera_median:
+            continue
+
+        discount_pct = (tradera_median - vinted_price) / tradera_median * 100
+        if discount_pct < min_discount_pct:
+            continue
+
+        days_listed = None
+        if r["first_seen_at"]:
+            try:
+                days_listed = (today - date.fromisoformat(r["first_seen_at"][:10])).days
+            except (ValueError, TypeError):
+                pass
+
+        opps.append({
+            "brand": r["brand"],
+            "category": r["category"],
+            "size": r["size"] or "Unknown",
+            "condition": r["condition"] or "–",
+            "url": r["url"],
+            "title": r["title"],
+            "vinted_price": vinted_price,
+            "tradera_median": tradera_median,
+            "tradera_n": pred["n"],
+            "tradera_gran": pred["granularity_label"],
+            "tradera_confidence": pred["confidence"],
+            "discount_pct": round(discount_pct, 1),
+            "gross_margin": tradera_median - vinted_price,
+            "days_listed": days_listed,
+        })
+
+    opps.sort(key=lambda x: x["discount_pct"], reverse=True)
+    return opps[:max_rows]
+
+
 def generate_report(conn: sqlite3.Connection, output_path: Optional[Path] = None) -> Path:
     cells = compute_metrics(conn)
     cross_channel = compute_cross_channel(cells)
     cycle_time = compute_cycle_time_insights(conn)
     pricing_lookups = build_lookups(conn)
+    flip_opps = compute_flip_opportunities(conn, pricing_lookups)
     cascade = build_cascade_index(conn)
     distincts = get_distinct_values(conn)
 
@@ -208,6 +280,7 @@ def generate_report(conn: sqlite3.Connection, output_path: Optional[Path] = None
         all_cells=cells,
         cross_channel=cross_channel,
         cycle_time=cycle_time,
+        flip_opps=flip_opps,
         pricing_lookups_json=json.dumps(pricing_lookups),
         cascade_json=json.dumps(cascade),
         pricing_coverage=pricing_coverage,
